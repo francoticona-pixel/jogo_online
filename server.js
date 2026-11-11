@@ -86,7 +86,7 @@ function roomState(room) {
       invisible: p.invisibleUntil > now
     })),
     bullets: room.bullets.map(b => ({
-      x: b.x, y: b.y, vx: b.vx, vy: b.vy, type: b.type
+      id: b.id, x: b.x, y: b.y, vx: b.vx, vy: b.vy, type: b.type
     })),
     crates: room.crates.map(c => ({ id: c.id, x: c.x, y: c.y, type: c.type })),
     clones: room.clones.map(c => ({
@@ -158,23 +158,31 @@ function spawnCrate(room) {
   });
 }
 function spawnClones(room, player, now) {
-  for (let i = 0; i < 2; i++) {
-    const spot = randomFreePoint(room, player.id);
+  const offsets = [{ x: -58, y: -48 }, { x: 58, y: 48 }];
+  for (let i = 0; i < offsets.length; i++) {
+    let x = clamp(player.x + offsets[i].x, 35, ARENA.w - 35);
+    let y = clamp(player.y + offsets[i].y, 35, ARENA.h - 35);
+    if (hitsWall(x, y, 20)) {
+      x = clamp(player.x - offsets[i].x, 35, ARENA.w - 35);
+      y = clamp(player.y - offsets[i].y, 35, ARENA.h - 35);
+    }
     room.cloneCounter++;
     room.clones.push({
       id: room.cloneCounter,
       owner: player.id,
       number: player.number,
-      x: spot.x,
-      y: spot.y,
+      x, y,
       angle: player.angle,
+      phase: i * Math.PI,
       expiresAt: now + 7500
     });
   }
 }
 function createProjectile(room, player, angle, type = "normal") {
   const bomb = type === "bomb";
+  room.bulletCounter++;
   room.bullets.push({
+    id: room.bulletCounter,
     owner: player.id,
     x: player.x + Math.cos(angle) * (bomb ? 30 : 23),
     y: player.y + Math.sin(angle) * (bomb ? 30 : 23),
@@ -234,14 +242,14 @@ function finishRoom(room) {
   if (!room.started || room.finished) return;
   const players = [...room.players.values()];
   const survivors = players.filter(p => p.connected && p.lives > 0);
-  const winnerId = survivors.length === 1 ? survivors[0].id : null;
   players.sort((a, b) => {
-    if (a.id === winnerId) return -1;
-    if (b.id === winnerId) return 1;
     const aActive = a.connected && a.lives > 0 ? 1 : 0;
     const bActive = b.connected && b.lives > 0 ? 1 : 0;
     return bActive - aActive || b.score - a.score || b.lives - a.lives || a.number - b.number;
   });
+  // A sole survivor wins; if everyone is eliminated in the same server tick,
+  // use eliminations/lives as a deterministic tiebreaker for the top spot.
+  const winnerId = survivors.length === 1 ? survivors[0].id : players[0]?.id || null;
   room.winnerId = winnerId;
   room.rankings = players.slice(0, 3).map((p, index) => ({
     position: index + 1,
@@ -310,6 +318,7 @@ io.on("connection", socket => {
         winnerId: null,
         crateCounter: 0,
         cloneCounter: 0,
+        bulletCounter: 0,
         nextCrateAt: 0,
         lastBroadcastAt: 0,
         started: false,
@@ -524,6 +533,18 @@ setInterval(() => {
     room.bullets = room.bullets.filter(b =>
       b.life > 0 && b.x > 0 && b.x < ARENA.w && b.y > 0 && b.y < ARENA.h
     );
+    for (const clone of room.clones) {
+      const owner = room.players.get(clone.owner);
+      if (!owner || !owner.connected || owner.lives <= 0 || owner.hp <= 0) continue;
+      const orbit = now / 620 + clone.phase;
+      const targetX = clamp(owner.x + Math.cos(orbit) * 52, 30, ARENA.w - 30);
+      const targetY = clamp(owner.y + Math.sin(orbit) * 42, 30, ARENA.h - 30);
+      const nextX = clone.x + (targetX - clone.x) * 0.14;
+      const nextY = clone.y + (targetY - clone.y) * 0.14;
+      if (!hitsWall(nextX, clone.y, 19)) clone.x = nextX;
+      if (!hitsWall(clone.x, nextY, 19)) clone.y = nextY;
+      clone.angle = owner.angle;
+    }
     room.clones = room.clones.filter(c => c.expiresAt > now);
     room.explosions = room.explosions.filter(e => e.expiresAt > now);
 
