@@ -55,3 +55,8 @@ body.playing-fullscreen{overflow:hidden}
 #arena{touch-action:none;image-rendering:auto}
 .arena-wrap{contain:layout paint}
 .game-panel{contain:layout style}
+
+/* Prévia compacta do cenário selecionado */
+#mapPreview{display:block;width:100%;height:auto;max-height:112px;margin-top:8px;border:1px solid #52614b;background:#101a17}
+.map-choice{min-width:0}
+.customize-row select{min-height:40px}
