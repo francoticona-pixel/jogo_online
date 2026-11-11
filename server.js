@@ -510,7 +510,7 @@ setInterval(() => {
               if (Math.hypot(target.x - bullet.x, target.y - bullet.y) < PLAYER_RADIUS + 9) { impact = true; break; }
             }
           }
-          if (impact || bullet.life <= 0) { bullet.vx = 0; bullet.vy = 0; bullet.fuseAt = now + 3000; }
+          if (impact || bullet.life <= 0) { bullet.vx = 0; bullet.vy = 0; bullet.life = 95; bullet.fuseAt = now + 3000; }
         } else if (now >= bullet.fuseAt) { explodeBomb(room, bullet, now); bullet.life = 0; }
         continue;
       }
