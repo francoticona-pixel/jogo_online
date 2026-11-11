@@ -88,7 +88,7 @@ function roomState(room) {
       skin: p.skin || "classic"
     })),
     bullets: room.bullets.map(b => ({
-      id: b.id, x: b.x, y: b.y, vx: b.vx, vy: b.vy, type: b.type
+      id: b.id, x: b.x, y: b.y, vx: b.vx, vy: b.vy, type: b.type, fuseLeft: b.fuseAt ? Math.max(0,b.fuseAt-now) : 0
     })),
     crates: room.crates.map(c => ({ id: c.id, x: c.x, y: c.y, type: c.type })),
     clones: room.clones.map(c => ({
@@ -98,7 +98,8 @@ function roomState(room) {
       x: e.x, y: e.y, radius: e.radius,
       remaining: Math.max(0, e.expiresAt - now)
     })),
-    rankings: room.rankings
+    rankings: room.rankings,
+    gas: room.gas ? { x: room.gas.x, y: room.gas.y, radius: room.gas.radius, remaining: Math.max(0, room.gas.endsAt - now) } : null
   };
 }
 function broadcast(room) {
@@ -150,7 +151,7 @@ function randomFreePoint(room, ignorePlayerId = null) {
 function spawnCrate(room) {
   if (room.crates.length >= 3) return;
   const spot = randomFreePoint(room);
-  const types = ["rapid", "speed", "triple", "shield", "invisibility", "clone", "bomb", "medkit", "life"];
+  const types = ["rapid", "speed", "triple", "shield", "invisibility", "clone", "bomb", "flame", "medkit"];
   room.crateCounter++;
   room.crates.push({
     id: room.crateCounter,
@@ -191,8 +192,9 @@ function createProjectile(room, player, angle, type = "normal") {
     vx: Math.cos(angle) * (bomb ? 7.2 : 12),
     vy: Math.sin(angle) * (bomb ? 7.2 : 12),
     life: bomb ? 105 : 75,
-    damage: bomb ? 48 : 20,
-    type
+    damage: bomb ? 48 : type === "flame" ? 7 : 20,
+    type,
+    fuseAt: 0
   });
   if (room.bullets.length > MAX_BULLETS_PER_ROOM) {
     room.bullets.splice(0, room.bullets.length - MAX_BULLETS_PER_ROOM);
@@ -259,6 +261,8 @@ function finishRoom(room) {
     number: p.number,
     score: p.score,
     lives: p.lives,
+    name: p.name,
+    skin: p.skin,
     winner: p.id === winnerId
   }));
   room.finished = true;
@@ -284,6 +288,7 @@ function startRoom(room) {
   room.crates = [];
   room.clones = [];
   room.explosions = [];
+  room.gas = { x: ARENA.w / 2, y: ARENA.h / 2, radius: 760, startAt: Date.now() + 18000, endsAt: Date.now() + 198000 };
   room.players.forEach(p => {
     p.score = 0;
     if (p.connected) resetPlayer(p, p.number - 1, true);
@@ -451,13 +456,14 @@ setInterval(() => {
       const dx = (p.input.right ? 1 : 0) - (p.input.left ? 1 : 0);
       const dy = (p.input.down ? 1 : 0) - (p.input.up ? 1 : 0);
       const length = Math.hypot(dx, dy) || 1;
-      const speed = p.power === "speed" ? 6.5 : 4.2;
+      const speed = p.power === "speed" ? 7.1 : 5.1;
       movePlayer(p, dx / length * speed, dy / length * speed);
 
       let fireDelay = 275;
       if (p.power === "rapid") fireDelay = 125;
       else if (p.power === "triple") fireDelay = 330;
-      else if (p.power === "bomb") fireDelay = 850;
+      else if (p.power === "bomb") fireDelay = 1100;
+      else if (p.power === "flame") fireDelay = 145;
       if (p.input.shoot && now >= p.nextShot) {
         p.nextShot = now + fireDelay;
         if (p.power === "triple") {
@@ -465,7 +471,7 @@ setInterval(() => {
           createProjectile(room, p, p.angle);
           createProjectile(room, p, p.angle + 0.2);
         } else {
-          createProjectile(room, p, p.angle, p.power === "bomb" ? "bomb" : "normal");
+          createProjectile(room, p, p.angle, p.power === "bomb" ? "bomb" : p.power === "flame" ? "flame" : "normal");
         }
       }
 
@@ -493,24 +499,28 @@ setInterval(() => {
       bullet.life--;
 
       if (bullet.type === "bomb") {
-        let impact = hitsWall(bullet.x, bullet.y, 8) ||
-          bullet.x < 12 || bullet.x > ARENA.w - 12 || bullet.y < 12 || bullet.y > ARENA.h - 12;
-        if (!impact) {
-          for (const target of players) {
-            if (target.id === bullet.owner || !target.connected || target.lives <= 0 || target.hp <= 0) continue;
-            if (Math.hypot(target.x - bullet.x, target.y - bullet.y) < PLAYER_RADIUS + 9) {
-              impact = true;
-              break;
+        if (!bullet.fuseAt) {
+          let impact = hitsWall(bullet.x, bullet.y, 8) || bullet.x < 12 || bullet.x > ARENA.w - 12 || bullet.y < 12 || bullet.y > ARENA.h - 12;
+          if (!impact) {
+            for (const target of players) {
+              if (target.id === bullet.owner || !target.connected || target.lives <= 0 || target.hp <= 0) continue;
+              if (Math.hypot(target.x - bullet.x, target.y - bullet.y) < PLAYER_RADIUS + 9) { impact = true; break; }
             }
           }
-        }
-        if (impact || bullet.life <= 0) {
-          explodeBomb(room, bullet, now);
-          bullet.life = 0;
-        }
+          if (impact || bullet.life <= 0) { bullet.vx = 0; bullet.vy = 0; bullet.fuseAt = now + 3000; }
+        } else if (now >= bullet.fuseAt) { explodeBomb(room, bullet, now); bullet.life = 0; }
         continue;
       }
 
+      if (bullet.type === "flame") {
+        let flameHit = false;
+        for (const target of players) {
+          if (target.id === bullet.owner || !target.connected || target.lives <= 0 || target.hp <= 0) continue;
+          if (Math.hypot(target.x - bullet.x, target.y - bullet.y) < PLAYER_RADIUS + 10) { damagePlayer(room,target,bullet.damage,bullet.owner,now); flameHit=true; break; }
+        }
+        if (flameHit || bullet.life <= 0 || hitsWall(bullet.x,bullet.y,5)) bullet.life=0;
+        continue;
+      }
       const hitWall = hitsWall(bullet.x, bullet.y, BULLET_RADIUS) ||
         WALLS.some(w => circleHitsRect((oldX + bullet.x) / 2, (oldY + bullet.y) / 2, BULLET_RADIUS + 6, w));
       if (hitWall) {
@@ -558,6 +568,11 @@ setInterval(() => {
     room.clones = room.clones.filter(c => c.expiresAt > now);
     room.explosions = room.explosions.filter(e => e.expiresAt > now);
 
+    if (room.gas && now >= room.gas.startAt) {
+      const progress = clamp((now-room.gas.startAt)/(room.gas.endsAt-room.gas.startAt),0,1);
+      room.gas.radius = 760-progress*650;
+      for (const p of players) if (p.connected && p.lives>0 && p.hp>0 && Math.hypot(p.x-room.gas.x,p.y-room.gas.y)>room.gas.radius) damagePlayer(room,p,0.22,null,now);
+    }
     if (now >= room.nextCrateAt) {
       spawnCrate(room);
       room.nextCrateAt = now + 15000 + Math.random() * 9000;
