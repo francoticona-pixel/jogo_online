@@ -253,13 +253,19 @@ function drawPlayers(dt){
     ctx.fillStyle="#fff1c2";ctx.fillRect(31,-2,7,4);
     ctx.fillStyle="rgba(255,255,255,.35)";ctx.fillRect(-14,-11,22,3);
     ctx.restore();
-    ctx.globalAlpha=hidden ? 0.22 : 1;
-    ctx.fillStyle="rgba(0,0,0,.6)";ctx.fillRect(r.x-25,r.y-38,50,6);
-    ctx.fillStyle=color;ctx.fillRect(r.x-25,r.y-38,50*Math.max(0,p.hp/100),6);
-    ctx.fillStyle="#f0f2e8";ctx.font="bold 12px monospace";ctx.textAlign="center";
-    ctx.fillText((p.name||("OP "+String(p.number).padStart(2,"0")))+(p.id===myId?" • VOCÊ":""),r.x,r.y-48);
-    ctx.fillStyle="#e46d5c";ctx.font="bold 11px monospace";ctx.fillText("♥ "+p.lives,r.x,r.y+39);
-    ctx.globalAlpha=1;
+    if(p.id===myId && p.power==="clone"){
+      ctx.save();ctx.strokeStyle="#c69cff";ctx.lineWidth=3;ctx.beginPath();ctx.arc(r.x,r.y,31,0,Math.PI*2);ctx.stroke();ctx.restore();
+    }
+    const disguised= p.id!==myId && (state.clones||[]).some(c=>c.owner===p.id);
+    if(!disguised){
+      ctx.globalAlpha=hidden ? 0.22 : 1;
+      ctx.fillStyle="rgba(0,0,0,.6)";ctx.fillRect(r.x-25,r.y-38,50,6);
+      ctx.fillStyle=color;ctx.fillRect(r.x-25,r.y-38,50*Math.max(0,p.hp/100),6);
+      ctx.fillStyle="#f0f2e8";ctx.font="bold 12px monospace";ctx.textAlign="center";
+      ctx.fillText((p.name||("OP "+String(p.number).padStart(2,"0")))+(p.id===myId?" • VOCÊ":""),r.x,r.y-48);
+      ctx.fillStyle="#e46d5c";ctx.font="bold 11px monospace";ctx.fillText("♥ "+p.lives,r.x,r.y+39);
+      ctx.globalAlpha=1;
+    }
   }
 }
 function drawBullets(dt){
