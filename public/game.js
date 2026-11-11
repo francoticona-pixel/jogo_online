@@ -11,6 +11,8 @@ const ZOOM = 0.78;
 let camera = { x: 800, y: 500 };
 const renderedPlayers = new Map();
 const renderedBullets = new Map();
+const skinStyles = { classic:"#c5e36b", crimson:"#ff5268", ice:"#74d9ff", gold:"#f3c65f", toxic:"#8aff66" };
+let selectedSkin="classic", selectedTheme="forest", selectedName="OPERADOR";
 const powers = {
   rapid: { label: "TIRO RÁPIDO", icon: "»", color: "#f0bb62" },
   speed: { label: "VELOCIDADE", icon: "⚡", color: "#62c3dc" },
@@ -18,7 +20,9 @@ const powers = {
   shield: { label: "ESCUDO", icon: "◇", color: "#69d0a4" },
   invisibility: { label: "INVISIBILIDADE", icon: "◌", color: "#a6c9ff" },
   clone: { label: "CLONAGEM", icon: "⧉", color: "#c69cff" },
-  bomb: { label: "LANÇA-BOMBA", icon: "✹", color: "#ff896c" }
+  bomb: { label: "LANÇA-BOMBA", icon: "✹", color: "#ff896c" },
+  medkit: { label: "KIT DE VIDA", icon: "+", color: "#ff6d87" },
+  life: { label: "VIDA EXTRA", icon: "♥", color: "#ff4f72" }
 };
 const playerColors = ["#c5e36b", "#e46d5c", "#62c3dc", "#d7a6f5", "#f0bb62", "#69d0a4", "#f07caa", "#98a8ff", "#d6dfed", "#d2db70"];
 const walls = [
@@ -35,8 +39,10 @@ mapCanvas.width = ARENA.w;
 mapCanvas.height = ARENA.h;
 const mapCtx = mapCanvas.getContext("2d");
 function buildMap() {
+  const palettes={forest:["#25382d","#101a17","#8c987e","#566b59","#293d32"],neon:["#211c3c","#080d20","#a76bff","#43336e","#17142b"],desert:["#57452d","#20170f","#d4ad6b","#997447","#4d3822"],ice:["#244457","#0d1c2a","#b6e7f4","#6897ae","#294b60"]};
+  const palette=palettes[selectedTheme]||palettes.forest;
   const g = mapCtx.createLinearGradient(0, 0, ARENA.w, ARENA.h);
-  g.addColorStop(0, "#25382d"); g.addColorStop(1, "#101a17");
+  g.addColorStop(0, palette[0]); g.addColorStop(1, palette[1]);
   mapCtx.fillStyle = g; mapCtx.fillRect(0, 0, ARENA.w, ARENA.h);
   mapCtx.strokeStyle = "rgba(161,190,160,.075)"; mapCtx.lineWidth = 1;
   for (let x = 0; x <= ARENA.w; x += 50) { mapCtx.beginPath(); mapCtx.moveTo(x,0); mapCtx.lineTo(x,ARENA.h); mapCtx.stroke(); }
@@ -44,9 +50,9 @@ function buildMap() {
   for (const w of walls) {
     mapCtx.save(); mapCtx.shadowColor = "rgba(0,0,0,.5)"; mapCtx.shadowBlur = 18; mapCtx.shadowOffsetY = 9;
     const grad = mapCtx.createLinearGradient(w.x,w.y,w.x,w.y+w.h);
-    grad.addColorStop(0,"#8c987e"); grad.addColorStop(.18,"#566b59"); grad.addColorStop(1,"#293d32");
+    grad.addColorStop(0,palette[2]); grad.addColorStop(.18,palette[3]); grad.addColorStop(1,palette[4]);
     mapCtx.fillStyle = grad; mapCtx.fillRect(w.x,w.y,w.w,w.h); mapCtx.restore();
-    mapCtx.strokeStyle = "#a9b99c"; mapCtx.lineWidth = 3; mapCtx.strokeRect(w.x+1.5,w.y+1.5,w.w-3,w.h-3);
+    mapCtx.strokeStyle = selectedTheme==="neon"?"#c59cff":selectedTheme==="ice"?"#c7f2ff":selectedTheme==="desert"?"#f2d19a":"#a9b99c"; mapCtx.lineWidth = 3; mapCtx.strokeRect(w.x+1.5,w.y+1.5,w.w-3,w.h-3);
     mapCtx.strokeStyle = "rgba(10,20,15,.55)"; mapCtx.lineWidth = 2;
     for (let x=w.x+12;x<w.x+w.w-5;x+=28) { mapCtx.beginPath(); mapCtx.moveTo(x,w.y+7); mapCtx.lineTo(x,w.y+w.h-7); mapCtx.stroke(); }
   }
@@ -55,10 +61,14 @@ function buildMap() {
 }
 buildMap();
 
+$("skinSelect").addEventListener("change",e=>{selectedSkin=e.target.value;});
+$("mapSelect").addEventListener("change",e=>{selectedTheme=e.target.value;buildMap();});
+$("fullscreenBtn").addEventListener("click",async()=>{try{if(!document.fullscreenElement)await $("gamePanel").requestFullscreen();else await document.exitFullscreen();}catch{$("gameStatus").textContent="TELA CHEIA INDISPONÍVEL NESTE NAVEGADOR";}});
 $("joinForm").addEventListener("submit", e => {
   e.preventDefault(); $("joinError").textContent = "";
   roomCode = $("roomCode").value.trim().toUpperCase();
-  if (roomCode) socket.emit("joinRoom", roomCode);
+  selectedName=($("playerName").value.trim()||"OPERADOR").slice(0,16);
+  if (roomCode) socket.emit("joinRoom", {code:roomCode,name:selectedName,skin:selectedSkin});
 });
 socket.on("connect_error", () => { $("joinError").textContent = "Não foi possível conectar ao servidor. Atualize a página."; });
 socket.on("joinError", msg => $("joinError").textContent = msg);
@@ -66,7 +76,7 @@ socket.on("startError", msg => { $("hostHint").textContent = msg; });
 socket.on("joined", data => {
   myId = data.playerId; myNumber = data.playerNumber; roomCode = data.code;
   $("roomLabel").textContent = roomCode;
-  $("playerLabel").textContent = "OPERADOR " + String(myNumber).padStart(2, "0");
+  $("playerLabel").textContent = selectedName;
   lobby.classList.add("hidden"); gamePanel.classList.remove("hidden"); startRender();
 });
 socket.on("roomInfo", info => {
@@ -78,7 +88,7 @@ socket.on("roomInfo", info => {
   info.players.forEach(p => {
     const tag = document.createElement("span");
     tag.className = "player-chip" + (p.id === info.hostId ? " host" : "");
-    tag.textContent = "OP " + String(p.number).padStart(2, "0") + (p.id === info.hostId ? " ★" : "");
+    tag.textContent = (p.name || ("OP "+String(p.number).padStart(2,"0"))) + (p.id === info.hostId ? " ★" : "");
     $("playersList").appendChild(tag);
   });
   const isHost = info.hostId === myId, start = $("startMatch");
@@ -114,7 +124,7 @@ function showResults(rankings) {
   rankings.forEach((p,i)=>{
     const row=document.createElement("div"); row.className="podium-row rank-"+(i+1);
     const medal=document.createElement("strong"); medal.textContent=medals[i]||("#"+p.position);
-    const name=document.createElement("span"); name.textContent="OPERADOR "+String(p.number).padStart(2,"0");
+    const name=document.createElement("span"); name.textContent=p.name||("OPERADOR "+String(p.number).padStart(2,"0"));
     const stats=document.createElement("small"); stats.textContent=p.score+" eliminações • "+p.lives+" vidas";
     row.append(medal,name,stats); $("podiumList").appendChild(row);
   });
@@ -122,6 +132,7 @@ function showResults(rankings) {
   $("resultTitle").textContent=champion?.winner ? "VITÓRIA DO OPERADOR "+String(champion.number).padStart(2,"0") : champion ? "TOP 1 — OPERADOR "+String(champion.number).padStart(2,"0") : "PARTIDA ENCERRADA";
 }
 $("returnLobby").addEventListener("click",()=>location.reload());
+document.addEventListener("fullscreenchange",()=>{document.body.classList.toggle("playing-fullscreen",!!document.fullscreenElement);});
 $("startMatch").addEventListener("click",()=>socket.emit("startGame"));
 window.addEventListener("keydown",e=>{keys[e.key.toLowerCase()]=true;});
 window.addEventListener("keyup",e=>{keys[e.key.toLowerCase()]=false;});
@@ -172,23 +183,25 @@ function drawPlayers(dt){
     const k=Math.min(.48,dt/75);
     r.x+=(p.x-r.x)*k;r.y+=(p.y-r.y)*k;
     let da=p.angle-r.angle;while(da>Math.PI)da-=Math.PI*2;while(da<-Math.PI)da+=Math.PI*2;r.angle+=da*k;
-    const color=playerColors[(p.number-1)%playerColors.length];
+    const color=skinStyles[p.skin]||playerColors[(p.number-1)%playerColors.length];
     const hidden=p.invisible&&p.id!==myId;
     ctx.save();ctx.translate(r.x,r.y);ctx.rotate(r.angle);
     ctx.globalAlpha=hidden ? 0.16 : 1;
     if(p.power==="shield"){ctx.strokeStyle=powers.shield.color;ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,27,0,Math.PI*2);ctx.stroke();}
     ctx.shadowColor=color;ctx.shadowBlur=hidden?3:17;
-    ctx.fillStyle="#0a120e";ctx.fillRect(-20,-16,42,32);
-    ctx.shadowBlur=0;ctx.fillStyle=color;ctx.fillRect(-15,-12,29,24);
-    ctx.fillStyle="#1c2b24";ctx.fillRect(-6,-8,13,16);
-    ctx.fillStyle="#d6ddca";ctx.fillRect(8,-5,25,10);
-    ctx.fillStyle="#fff1c2";ctx.fillRect(29,-2,8,4);
+    ctx.fillStyle="#080d12";ctx.beginPath();ctx.roundRect(-21,-17,44,34,7);ctx.fill();
+    ctx.shadowBlur=0;ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(-16,-12,31,24,5);ctx.fill();
+    ctx.fillStyle="#17232b";ctx.fillRect(-7,-8,14,16);
+    ctx.strokeStyle="rgba(255,255,255,.65)";ctx.lineWidth=2;ctx.strokeRect(-12,-9,7,18);ctx.strokeRect(2,-9,7,18);
+    ctx.fillStyle="#d6e3e8";ctx.beginPath();ctx.roundRect(8,-5,27,10,3);ctx.fill();
+    ctx.fillStyle="#fff1c2";ctx.fillRect(31,-2,7,4);
+    ctx.fillStyle="rgba(255,255,255,.35)";ctx.fillRect(-14,-11,22,3);
     ctx.restore();
     ctx.globalAlpha=hidden ? 0.22 : 1;
     ctx.fillStyle="rgba(0,0,0,.6)";ctx.fillRect(r.x-25,r.y-38,50,6);
     ctx.fillStyle=color;ctx.fillRect(r.x-25,r.y-38,50*Math.max(0,p.hp/100),6);
     ctx.fillStyle="#f0f2e8";ctx.font="12px monospace";ctx.textAlign="center";
-    ctx.fillText("OP "+String(p.number).padStart(2,"0")+(p.id===myId?" • VOCÊ":""),r.x,r.y-48);
+    ctx.fillText((p.name||("OP "+String(p.number).padStart(2,"0")))+(p.id===myId?" • VOCÊ":""),r.x,r.y-48);
     ctx.fillStyle="#e46d5c";ctx.font="bold 11px monospace";ctx.fillText("♥ "+p.lives,r.x,r.y+39);
     ctx.globalAlpha=1;
   }
