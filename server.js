@@ -83,7 +83,9 @@ function roomState(room) {
       eliminated: !p.connected || p.lives <= 0,
       power: p.powerUntil > now ? p.power : null,
       powerLeft: p.powerUntil > now ? p.powerUntil - now : 0,
-      invisible: p.invisibleUntil > now
+      invisible: p.invisibleUntil > now,
+      name: p.name || ("OP " + String(p.number).padStart(2,"0")),
+      skin: p.skin || "classic"
     })),
     bullets: room.bullets.map(b => ({
       id: b.id, x: b.x, y: b.y, vx: b.vx, vy: b.vy, type: b.type
@@ -113,7 +115,7 @@ function broadcastRoomInfo(room) {
     started: room.started,
     count: connected.length,
     maxPlayers: MAX_PLAYERS,
-    players: connected.map(p => ({ id: p.id, number: p.number }))
+    players: connected.map(p => ({ id: p.id, number: p.number, name: p.name, skin: p.skin }))
   });
 }
 function resetPlayer(p, index, resetLives = false) {
@@ -148,7 +150,7 @@ function randomFreePoint(room, ignorePlayerId = null) {
 function spawnCrate(room) {
   if (room.crates.length >= 3) return;
   const spot = randomFreePoint(room);
-  const types = ["rapid", "speed", "triple", "shield", "invisibility", "clone", "bomb"];
+  const types = ["rapid", "speed", "triple", "shield", "invisibility", "clone", "bomb", "medkit", "life"];
   room.crateCounter++;
   room.crates.push({
     id: room.crateCounter,
@@ -299,9 +301,13 @@ function startRoom(room) {
 }
 
 io.on("connection", socket => {
-  socket.on("joinRoom", rawCode => {
+  socket.on("joinRoom", rawData => {
     if (socket.data.room) return socket.emit("joinError", "Você já está em uma sala.");
-    const code = String(rawCode || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+    const payload = rawData && typeof rawData === "object" ? rawData : {code:rawData};
+    const code = String(payload.code || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+    const playerName = String(payload.name || "OPERADOR").replace(/[^\p{L}\p{N} _.-]/gu,"").trim().slice(0,16) || "OPERADOR";
+    const allowedSkins = ["classic","crimson","ice","gold","toxic"];
+    const playerSkin = allowedSkins.includes(payload.skin) ? payload.skin : "classic";
     if (!code) return socket.emit("joinError", "Digite um código de sala.");
 
     let room = rooms.get(code);
@@ -342,6 +348,8 @@ io.on("connection", socket => {
     const player = {
       id: socket.id,
       number,
+      name: playerName,
+      skin: playerSkin,
       x: point.x,
       y: point.y,
       angle: 0,
@@ -467,6 +475,8 @@ setInterval(() => {
         p.power = crate.type;
         p.powerUntil = now + POWER_DURATION;
         if (crate.type === "invisibility") p.invisibleUntil = now + 7800;
+        if (crate.type === "medkit") { p.hp = Math.min(100, p.hp + 55); p.powerUntil = now + 2500; }
+        if (crate.type === "life") { p.lives = Math.min(5, p.lives + 1); p.powerUntil = now + 2500; }
         if (crate.type === "clone") {
           spawnClones(room, p, now);
           p.powerUntil = now + 3000;

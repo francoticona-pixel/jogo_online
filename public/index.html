@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>DUEL ARENA | Tactical Combat</title>
-  <link rel="stylesheet" href="style.css?v=duel-2">
+  <link rel="stylesheet" href="style.css?v=duel-3">
 </head>
 <body>
   <main class="shell">
@@ -22,6 +22,9 @@
       </div>
       <div class="lobby-actions">
         <form id="joinForm">
+          <label for="playerName">SEU NOME</label>
+          <input id="playerName" maxlength="16" placeholder="EX: FRANCO" autocomplete="nickname" value="OPERADOR">
+          <div class="customize-row"><div><label for="skinSelect">SKIN DO TANQUE</label><select id="skinSelect"><option value="classic">NEON CLÁSSICO</option><option value="crimson">FÚRIA RUBRA</option><option value="ice">GELO TÁTICO</option><option value="gold">OURO ELITE</option><option value="toxic">TOXINA</option></select></div><div><label for="mapSelect">TEMA DO MAPA</label><select id="mapSelect"><option value="forest">FLORESTA</option><option value="neon">NEON CITY</option><option value="desert">DESERTO</option><option value="ice">GELO</option></select></div></div>
           <label for="roomCode">CÓDIGO DA SALA</label>
           <input id="roomCode" maxlength="8" placeholder="EX: ALFA01" autocomplete="off" required>
           <button type="submit">CRIAR / ENTRAR NA SALA <b>→</b></button>
@@ -79,6 +82,7 @@
 
       <div class="arena-wrap">
         <canvas id="arena" width="1000" height="620"></canvas>
+        <button id="fullscreenBtn" class="fullscreen-btn" type="button" title="Tela cheia">⛶ TELA CHEIA</button>
         <div id="waiting" class="waiting"><strong>AGUARDANDO INÍCIO DA PARTIDA</strong><span>O anfitrião começará quando todos estiverem prontos.</span></div>
       </div>
       <div class="bottom-hud">
@@ -100,7 +104,7 @@
     <footer><span>DUEL ARENA // MULTIPLAYER 0.3</span><span>JOGUE COM RESPEITO. LUTE PELA VITÓRIA.</span></footer>
   </main>
   <script src="/socket.io/socket.io.js"></script>
-  <script src="game.js?v=duel-2"></script>
+  <script src="game.js?v=duel-3"></script>
   <script src="adventure.js?v=duel-1"></script>
 </body>
 </html>
