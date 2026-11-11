@@ -8,21 +8,31 @@
 </head>
 <body>
   <main class="shell">
-    <header><div class="brand-mark">DA</div><div><p class="eyebrow">COMBATE TÁTICO • MULTIPLAYER</p><h1>DUEL <span>ARENA</span></h1></div><div class="online"><i></i> SERVIDOR PRONTO</div></header>
+    <header>
+      <div class="brand-mark">DA</div>
+      <div><p class="eyebrow">COMBATE TÁTICO • MULTIPLAYER</p><h1>DUEL <span>ARENA</span></h1></div>
+      <div class="online"><i></i> SERVIDOR PRONTO</div>
+    </header>
+
     <section id="lobby" class="panel lobby">
-      <div class="lobby-copy"><p class="eyebrow">OPERAÇÃO 01 / X1</p><h2>Entre na arena.</h2><p>Crie uma sala com um código e compartilhe com seu adversário. Dois operadores. Uma vitória.</p></div>
+      <div class="lobby-copy">
+        <p class="eyebrow">OPERAÇÃO 01 / ARENA</p>
+        <h2>Monte sua equipe.</h2>
+        <p>Crie uma sala e convide seus amigos. Até 10 operadores na mesma arena. Quem criou a sala escolhe quando começar.</p>
+      </div>
       <div class="lobby-actions">
         <form id="joinForm">
           <label for="roomCode">CÓDIGO DA SALA</label>
           <input id="roomCode" maxlength="8" placeholder="EX: ALFA01" autocomplete="off" required>
-          <button type="submit">ENTRAR NA PARTIDA <b>→</b></button>
-          <small>Os dois jogadores devem usar exatamente o mesmo código.</small>
+          <button type="submit">CRIAR / ENTRAR NA SALA <b>→</b></button>
+          <small>Todos devem digitar exatamente o mesmo código. Máximo de 10 jogadores.</small>
         </form>
         <div class="mode-divider"><span>OU JOGUE SOZINHO</span></div>
         <button id="openAdventure" class="adventure-entry" type="button">MODO AVENTURA <b>20 FASES →</b></button>
       </div>
       <div id="joinError" class="error"></div>
     </section>
+
     <section id="adventurePanel" class="adventure-panel hidden">
       <div class="adventure-top">
         <div><p class="eyebrow">CAMPANHA SOLO</p><h2>OPERAÇÃO <span>AVENTURA</span></h2><p class="adventure-sub">20 missões. Sem reforços. Complete cada fase para desbloquear a próxima.</p></div>
@@ -48,14 +58,42 @@
         <p>PROGRESSO SALVO AUTOMATICAMENTE NESTE NAVEGADOR</p>
       </div>
     </section>
+
     <section id="gamePanel" class="game-panel hidden">
-      <div class="hud"><div><span class="eyebrow">SALA</span><strong id="roomLabel">----</strong></div><div class="status" id="gameStatus">AGUARDANDO OPONENTE</div><div><span class="eyebrow">VOCÊ</span><strong id="playerLabel">JOGADOR</strong></div></div>
-      <div class="arena-wrap"><canvas id="arena" width="1000" height="620"></canvas><div id="waiting" class="waiting"><strong>AGUARDANDO SEGUNDO JOGADOR</strong><span>Envie o código da sala para seu amigo.</span></div></div>
-      <div class="bottom-hud"><div class="health"><span>VIDA</span><div><i id="healthFill"></i></div><b id="healthText">100%</b></div><div class="score" id="scoreText">PLACAR&nbsp; 0 — 0</div><button id="copyCode" class="secondary">COPIAR CÓDIGO</button></div>
-      <p class="controls">MOVIMENTO: <b>W A S D</b> &nbsp; • &nbsp; MIRAR: <b>MOUSE</b> &nbsp; • &nbsp; ATIRAR: <b>CLIQUE ESQUERDO</b></p>
+      <div class="hud">
+        <div><span class="eyebrow">SALA</span><strong id="roomLabel">----</strong></div>
+        <div class="status" id="gameStatus">AGUARDANDO JOGADORES</div>
+        <div><span class="eyebrow">VOCÊ</span><strong id="playerLabel">OPERADOR</strong></div>
+      </div>
+
+      <div id="roomLobby" class="room-lobby">
+        <div class="room-lobby-head">
+          <div><p class="eyebrow">SALA DE ESPERA</p><strong id="roomLobbyCount">1 / 10 OPERADORES</strong><p id="roomLobbyHelp">Compartilhe o código e aguarde seus amigos.</p></div>
+          <div id="playersList" class="players-list"></div>
+        </div>
+        <div class="room-lobby-actions">
+          <span id="hostHint">O criador da sala pode iniciar quando houver pelo menos 2 jogadores.</span>
+          <button id="startMatch" type="button" disabled>COMEÇAR PARTIDA <b>→</b></button>
+        </div>
+      </div>
+
+      <div class="arena-wrap">
+        <canvas id="arena" width="1000" height="620"></canvas>
+        <div id="waiting" class="waiting"><strong>AGUARDANDO INÍCIO DA PARTIDA</strong><span>O anfitrião começará quando todos estiverem prontos.</span></div>
+      </div>
+      <div class="bottom-hud">
+        <div class="health"><span>VIDA</span><div><i id="healthFill"></i></div><b id="healthText">100%</b></div>
+        <div class="score" id="scoreText">PLACAR&nbsp; —</div>
+        <div id="powerHud" class="power-hud">SEM PODER</div>
+        <button id="copyCode" class="secondary">COPIAR CÓDIGO</button>
+      </div>
+      <p class="controls">MOVIMENTO: <b>W A S D</b> &nbsp; • &nbsp; MIRAR: <b>MOUSE</b> &nbsp; • &nbsp; ATIRAR: <b>CLIQUE ESQUERDO</b> &nbsp; • &nbsp; CAIXAS: <b>ENCOSTE PARA PEGAR</b></p>
     </section>
-    <footer><span>DUEL ARENA // PROTÓTIPO 0.2</span><span>JOGUE COM RESPEITO. LUTE PELA VITÓRIA.</span></footer>
+
+    <footer><span>DUEL ARENA // MULTIPLAYER 0.3</span><span>JOGUE COM RESPEITO. LUTE PELA VITÓRIA.</span></footer>
   </main>
-  <script src="/socket.io/socket.io.js"></script><script src="game.js"></script><script src="adventure.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="game.js"></script>
+  <script src="adventure.js"></script>
 </body>
 </html>
