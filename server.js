@@ -85,7 +85,7 @@ function roomState(room) {
       skin: p.skin || "classic"
     })),
     bullets: room.bullets.map(b => ({
-      id: b.id, x: b.x, y: b.y, vx: b.vx, vy: b.vy, type: b.type, fuseLeft: b.fuseAt ? Math.max(0,b.fuseAt-now) : 0
+      id: b.id, owner: b.owner, x: b.x, y: b.y, vx: b.vx, vy: b.vy, type: b.type, fuseLeft: b.fuseAt ? Math.max(0,b.fuseAt-now) : 0
     })),
     crates: room.crates.map(c => ({ id: c.id, x: c.x, y: c.y, type: c.type })),
     clones: room.clones.map(c => ({
@@ -201,10 +201,10 @@ function createProjectile(room, player, angle, type = "normal") {
     owner: player.id,
     x: player.x + Math.cos(angle) * (bomb ? 30 : 23),
     y: player.y + Math.sin(angle) * (bomb ? 30 : 23),
-    vx: Math.cos(angle) * (bomb ? 7.2 : 12),
-    vy: Math.sin(angle) * (bomb ? 7.2 : 12),
-    life: bomb ? 105 : 75,
-    damage: bomb ? 48 : type === "flame" ? 7 : 20,
+    vx: Math.cos(angle) * (bomb ? 7.2 : type === "flame" ? 8.5 : 12),
+    vy: Math.sin(angle) * (bomb ? 7.2 : type === "flame" ? 8.5 : 12),
+    life: bomb ? 105 : type === "flame" ? 14 : 75,
+    damage: bomb ? 48 : type === "flame" ? 4 : 20,
     type,
     fuseAt: 0
   });
@@ -284,7 +284,11 @@ function finishRoom(room) {
   room.clones = [];
   room.explosions = [];
   broadcastRoomInfo(room);
-  broadcast(room);
+  // Resultado final é crítico: não usar volatile, pois o pacote não pode ser descartado.
+  const finalState = roomState(room);
+  io.to(room.code).emit("state", finalState);
+  const champion = room.rankings[0];
+  io.to(room.code).emit("winner", { name: champion?.name || "OPERADOR", id: champion?.id || null });
 }
 function checkRoomFinished(room) {
   if (!room.started) return;
@@ -476,7 +480,7 @@ setInterval(() => {
       if (p.power === "rapid") fireDelay = 125;
       else if (p.power === "triple") fireDelay = 330;
       else if (p.power === "bomb") fireDelay = 1100;
-      else if (p.power === "flame") fireDelay = 145;
+      else if (p.power === "flame") fireDelay = 70;
       if (p.input.shoot && now >= p.nextShot) {
         p.nextShot = now + fireDelay;
         if (p.power === "triple") {
@@ -494,6 +498,7 @@ setInterval(() => {
         p.power = crate.type;
         p.powerUntil = now + POWER_DURATION;
         if (crate.type === "invisibility") p.invisibleUntil = now + 7800;
+        if (crate.type === "shield") { p.powerUntil = now + 6000; p.invulnerableUntil = now + 6000; }
         if (crate.type === "medkit") { p.hp = Math.min(100, p.hp + 55); p.powerUntil = now + 2500; }
         if (crate.type === "life") { p.lives = Math.min(5, p.lives + 1); p.powerUntil = now + 2500; }
         if (crate.type === "clone") {
