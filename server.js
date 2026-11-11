@@ -15,9 +15,9 @@ const ARENA = { w: 2000, h: 1300 };
 const MAX_PLAYERS = 10;
 const PLAYER_RADIUS = 17;
 const BULLET_RADIUS = 4;
-const MAX_BULLETS_PER_ROOM = 100;
+const MAX_BULLETS_PER_ROOM = 75;
 const TICK_MS = 1000 / 30;
-const SNAPSHOT_MS = 1000 / 15;
+const SNAPSHOT_MS = 1000 / 12;
 const POWER_DURATION = 10000;
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
@@ -469,7 +469,7 @@ setInterval(() => {
       const dx = (p.input.right ? 1 : 0) - (p.input.left ? 1 : 0);
       const dy = (p.input.down ? 1 : 0) - (p.input.up ? 1 : 0);
       const length = Math.hypot(dx, dy) || 1;
-      const speed = p.power === "speed" ? 7.8 : 6.2;
+      const speed = p.power === "speed" ? 9.0 : 7.2;
       movePlayer(p, dx / length * speed, dy / length * speed);
 
       let fireDelay = 275;
