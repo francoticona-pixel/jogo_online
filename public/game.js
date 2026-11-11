@@ -211,7 +211,7 @@ function drawCrates(){
   for(const crate of state.crates||[]){
     const p=powers[crate.type]||powers.rapid;
     ctx.save();ctx.translate(crate.x,crate.y);ctx.rotate(Math.sin(performance.now()/250)*.08);
-    ctx.shadowColor=p.color;ctx.shadowBlur=24;ctx.fillStyle="#101a15";ctx.fillRect(-20,-20,40,40);
+    ctx.shadowColor=p.color;ctx.shadowBlur=8;ctx.fillStyle="#101a15";ctx.fillRect(-20,-20,40,40);
     ctx.shadowBlur=0;ctx.fillStyle=p.color;ctx.fillRect(-16,-16,32,32);
     ctx.strokeStyle="#fff";ctx.lineWidth=3;ctx.strokeRect(-16,-16,32,32);
     ctx.fillStyle="#17231c";ctx.font="bold 23px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(p.icon,0,1);ctx.restore();
@@ -297,16 +297,18 @@ function startRender(){
 function draw(){
   if(gamePanel.classList.contains("hidden")){rendering=false;return;}
   const now=performance.now(),dt=Math.min(40,now-previousFrame);previousFrame=now;
+  const viewW=canvas.width/ZOOM, viewH=canvas.height/ZOOM;
   const me=state.players.find(p=>p.id===myId);
   if(me&&me.connected){
-    const viewW=canvas.width/ZOOM, viewH=canvas.height/ZOOM;
     const targetX=Math.max(viewW/2,Math.min(ARENA.w-viewW/2,me.x));
     const targetY=Math.max(viewH/2,Math.min(ARENA.h-viewH/2,me.y));
     camera.x+=(targetX-camera.x)*.14;camera.y+=(targetY-camera.y)*.14;
   } else if(!myId){camera.x+=(800-camera.x)*.08;camera.y+=(500-camera.y)*.08;}
   ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle="#101a17";ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.setTransform(ZOOM,0,0,ZOOM,canvas.width/2-camera.x*ZOOM,canvas.height/2-camera.y*ZOOM);
-  ctx.drawImage(mapCanvas,0,0);
+  const sx=Math.max(0,Math.min(ARENA.w-viewW,camera.x-viewW/2));
+  const sy=Math.max(0,Math.min(ARENA.h-viewH,camera.y-viewH/2));
+  ctx.drawImage(mapCanvas,sx,sy,viewW,viewH,sx,sy,viewW,viewH);
   if(state.gas && state.gas.remaining>0){ctx.save();ctx.fillStyle="rgba(144,205,83,.23)";ctx.beginPath();ctx.rect(0,0,ARENA.w,ARENA.h);ctx.arc(state.gas.x,state.gas.y,state.gas.radius,0,Math.PI*2,true);ctx.fill("evenodd");ctx.strokeStyle="rgba(188,235,110,.9)";ctx.lineWidth=8;ctx.beginPath();ctx.arc(state.gas.x,state.gas.y,state.gas.radius,0,Math.PI*2);ctx.stroke();ctx.restore();}
   drawCrates();drawClones();drawExplosions();drawBullets(dt);drawPlayers(dt);
   ctx.setTransform(1,0,0,1,0,0);
