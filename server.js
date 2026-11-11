@@ -136,7 +136,7 @@ function resetPlayer(p, index, resetLives = false, room = null) {
 }
 function randomRespawnPoint(room, ignorePlayerId = null) {
   const gas = room.gas;
-  const safeRadius = gas ? Math.max(80, gas.radius - 65) : Infinity;
+  const safeRadius = gas ? Math.max(80, gas.radius - 65) : Math.hypot(ARENA.w, ARENA.h);
   for (let attempt = 0; attempt < 260; attempt++) {
     const x = 55 + Math.random() * (ARENA.w - 110);
     const y = 55 + Math.random() * (ARENA.h - 110);
