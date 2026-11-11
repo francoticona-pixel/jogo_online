@@ -27,8 +27,8 @@ const WALLS = [
 ];
 
 const SPAWNS = [
-  { x: 100, y: 85 }, { x: 300, y: 85 }, { x: 500, y: 85 }, { x: 700, y: 85 }, { x: 900, y: 85 },
-  { x: 100, y: 535 }, { x: 300, y: 535 }, { x: 500, y: 535 }, { x: 700, y: 535 }, { x: 900, y: 535 }
+  { x: 100, y: 85 }, { x: 300, y: 85 }, { x: 500, y: 45 }, { x: 700, y: 85 }, { x: 900, y: 85 },
+  { x: 100, y: 535 }, { x: 300, y: 535 }, { x: 500, y: 575 }, { x: 700, y: 535 }, { x: 900, y: 535 }
 ];
 
 function circleHitsRect(x, y, radius, rect) {
@@ -129,9 +129,9 @@ function startRoom(room) {
   room.started = true;
   room.bullets = [];
   room.crates = [];
-  room.players.forEach((p, index) => {
+  room.players.forEach(p => {
     p.score = 0;
-    resetPlayer(p, index);
+    resetPlayer(p, p.number - 1);
   });
   const now = Date.now();
   room.nextCrateAt = now + 9000;
@@ -162,7 +162,10 @@ io.on("connection", socket => {
     if (room.started) return socket.emit("joinError", "Essa partida já começou. Crie outra sala para entrar.");
     if (room.players.size >= MAX_PLAYERS) return socket.emit("joinError", "Sala cheia! O limite é de 10 jogadores.");
 
-    const number = room.players.size + 1;
+    const occupiedNumbers = new Set([...room.players.values()].map(p => p.number));
+    let number = 1;
+    while (occupiedNumbers.has(number) && number <= MAX_PLAYERS) number++;
+    if (number > MAX_PLAYERS) return socket.emit("joinError", "Sala cheia! O limite é de 10 jogadores.");
     const point = spawnPoint(number - 1);
     const player = {
       id: socket.id,
@@ -235,8 +238,7 @@ setInterval(() => {
     for (const p of room.players.values()) {
       if (p.hp <= 0) {
         if (p.respawnAt && now >= p.respawnAt) {
-          const index = [...room.players.keys()].indexOf(p.id);
-          resetPlayer(p, Math.max(0, index));
+          resetPlayer(p, p.number - 1);
         }
         continue;
       }
