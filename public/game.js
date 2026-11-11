@@ -78,6 +78,16 @@ function buildMap() {
   }
   mapCtx.strokeStyle = "rgba(197,227,107,.45)"; mapCtx.lineWidth = 4; mapCtx.setLineDash([16,14]);
   mapCtx.strokeRect(20,20,ARENA.w-40,ARENA.h-40); mapCtx.setLineDash([]);
+  drawMapPreview();
+}
+function drawMapPreview(){
+  const preview=$("mapPreview"); if(!preview||!mapCanvas)return;
+  const pctx=preview.getContext("2d");
+  pctx.clearRect(0,0,preview.width,preview.height);
+  pctx.drawImage(mapCanvas,0,0,ARENA.w,ARENA.h,0,0,preview.width,preview.height);
+  pctx.fillStyle="rgba(5,10,7,.72)";pctx.fillRect(6,6,preview.width-12,19);
+  pctx.fillStyle="#c5e36b";pctx.font="bold 10px monospace";pctx.textAlign="left";
+  pctx.fillText(({forest:"FLORESTA",neon:"NEON CITY",desert:"DESERTO",ice:"GELO"})[selectedTheme]||"ARENA",12,19);
 }
 buildMap();
 
@@ -224,7 +234,7 @@ function drawPlayers(dt){
     if(p.invisible && p.id!==myId) continue;
     let r=renderedPlayers.get(p.id);
     if(!r){r={x:p.x,y:p.y,angle:p.angle};renderedPlayers.set(p.id,r);}
-    const k=1-Math.exp(-dt/48);
+    const k=1-Math.exp(-dt/(p.id===myId?34:62));
     r.x+=(p.x-r.x)*k;r.y+=(p.y-r.y)*k;
     let da=p.angle-r.angle;while(da>Math.PI)da-=Math.PI*2;while(da<-Math.PI)da+=Math.PI*2;r.angle+=da*k;
     const color=skinStyles[p.skin]||playerColors[(p.number-1)%playerColors.length];
@@ -273,9 +283,17 @@ function drawBullets(dt){
 }
 function drawClones(){
   for(const c of state.clones||[]){
-    ctx.save();ctx.globalAlpha=.62;ctx.translate(c.x,c.y);ctx.rotate(c.angle);
-    ctx.strokeStyle="#c69cff";ctx.lineWidth=3;ctx.setLineDash([5,4]);ctx.strokeRect(-20,-16,40,32);ctx.setLineDash([]);
-    ctx.fillStyle="#c69cff";ctx.fillRect(-13,-10,26,20);ctx.fillStyle="#20202d";ctx.fillRect(8,-5,23,10);
+    const owner=state.players.find(p=>p.id===c.owner);
+    const color=owner?(skinStyles[owner.skin]||playerColors[(owner.number-1)%playerColors.length]):"#c5e36b";
+    const ownerView=c.owner===myId;
+    ctx.save();ctx.globalAlpha=1;ctx.translate(c.x,c.y);ctx.rotate(c.angle);
+    if(ownerView){ctx.strokeStyle="#c69cff";ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,27,0,Math.PI*2);ctx.stroke();}
+    ctx.fillStyle="#080d12";ctx.beginPath();ctx.roundRect(-23,-18,47,36,8);ctx.fill();
+    ctx.fillStyle="#29333a";ctx.fillRect(-20,-16,42,5);ctx.fillRect(-20,11,42,5);
+    ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(-16,-12,31,24,5);ctx.fill();
+    ctx.fillStyle="#17232b";ctx.beginPath();ctx.roundRect(-8,-9,18,18,5);ctx.fill();
+    ctx.fillStyle="#d6e3e8";ctx.beginPath();ctx.roundRect(8,-5,27,10,3);ctx.fill();
+    ctx.fillStyle="#fff1c2";ctx.fillRect(31,-2,7,4);
     ctx.restore();
   }
 }
