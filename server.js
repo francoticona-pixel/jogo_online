@@ -4,31 +4,42 @@ const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  perMessageDeflate: false,
+  httpCompression: false
+});
 app.use(express.static("public"));
 
 const rooms = new Map();
-const ARENA = { w: 1000, h: 620 };
+const ARENA = { w: 1600, h: 1000 };
 const MAX_PLAYERS = 10;
 const PLAYER_RADIUS = 17;
 const BULLET_RADIUS = 4;
+const MAX_BULLETS_PER_ROOM = 140;
+const TICK_MS = 1000 / 30;
+const SNAPSHOT_MS = 1000 / 15;
+const POWER_DURATION = 10000;
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
 const WALLS = [
-  { x: 245, y: 135, w: 130, h: 42 },
-  { x: 625, y: 135, w: 130, h: 42 },
-  { x: 245, y: 443, w: 130, h: 42 },
-  { x: 625, y: 443, w: 130, h: 42 },
-  { x: 468, y: 250, w: 64, h: 120 },
-  { x: 100, y: 278, w: 55, h: 64 },
-  { x: 845, y: 278, w: 55, h: 64 },
-  { x: 452, y: 72, w: 96, h: 28 },
-  { x: 452, y: 520, w: 96, h: 28 }
+  { x: 300, y: 200, w: 180, h: 55 },
+  { x: 1120, y: 200, w: 180, h: 55 },
+  { x: 300, y: 745, w: 180, h: 55 },
+  { x: 1120, y: 745, w: 180, h: 55 },
+  { x: 755, y: 350, w: 90, h: 300 },
+  { x: 155, y: 430, w: 90, h: 130 },
+  { x: 1355, y: 430, w: 90, h: 130 },
+  { x: 600, y: 150, w: 400, h: 42 },
+  { x: 600, y: 808, w: 400, h: 42 },
+  { x: 540, y: 445, w: 150, h: 75 },
+  { x: 910, y: 480, w: 150, h: 75 },
+  { x: 520, y: 615, w: 120, h: 55 },
+  { x: 960, y: 350, w: 120, h: 55 }
 ];
 
 const SPAWNS = [
-  { x: 100, y: 85 }, { x: 300, y: 85 }, { x: 500, y: 45 }, { x: 700, y: 85 }, { x: 900, y: 85 },
-  { x: 100, y: 535 }, { x: 300, y: 535 }, { x: 500, y: 575 }, { x: 700, y: 535 }, { x: 900, y: 535 }
+  { x: 120, y: 120 }, { x: 450, y: 120 }, { x: 800, y: 110 }, { x: 1150, y: 120 }, { x: 1480, y: 120 },
+  { x: 120, y: 880 }, { x: 450, y: 880 }, { x: 800, y: 890 }, { x: 1150, y: 880 }, { x: 1480, y: 880 }
 ];
 
 function circleHitsRect(x, y, radius, rect) {
@@ -49,12 +60,14 @@ function spawnPoint(index) {
   const point = SPAWNS[index % SPAWNS.length];
   return { x: point.x, y: point.y };
 }
+function isConnectedPlayer(p) {
+  return !!p.connected;
+}
 function roomState(room) {
   const now = Date.now();
   return {
-    status: room.started ? "playing" : "waiting",
+    status: room.finished ? "finished" : room.started ? "playing" : "waiting",
     maxPlayers: MAX_PLAYERS,
-    hostId: room.hostId,
     players: [...room.players.values()].map(p => ({
       id: p.id,
       number: p.number,
@@ -62,79 +75,217 @@ function roomState(room) {
       y: p.y,
       angle: p.angle,
       hp: p.hp,
+      lives: p.lives,
       score: p.score,
-      alive: p.hp > 0,
+      connected: p.connected,
+      alive: p.connected && p.lives > 0 && p.hp > 0,
+      respawning: p.connected && p.lives > 0 && p.hp <= 0,
+      eliminated: !p.connected || p.lives <= 0,
       power: p.powerUntil > now ? p.power : null,
-      powerLeft: p.powerUntil > now ? p.powerUntil - now : 0
+      powerLeft: p.powerUntil > now ? p.powerUntil - now : 0,
+      invisible: p.invisibleUntil > now
     })),
-    bullets: room.bullets.map(b => ({ x: b.x, y: b.y, vx: b.vx, vy: b.vy })),
-    crates: room.crates.map(c => ({ id: c.id, x: c.x, y: c.y, type: c.type }))
+    bullets: room.bullets.map(b => ({
+      x: b.x, y: b.y, vx: b.vx, vy: b.vy, type: b.type
+    })),
+    crates: room.crates.map(c => ({ id: c.id, x: c.x, y: c.y, type: c.type })),
+    clones: room.clones.map(c => ({
+      id: c.id, owner: c.owner, number: c.number, x: c.x, y: c.y, angle: c.angle
+    })),
+    explosions: room.explosions.map(e => ({
+      x: e.x, y: e.y, radius: e.radius,
+      remaining: Math.max(0, e.expiresAt - now)
+    })),
+    rankings: room.rankings
   };
 }
 function broadcast(room) {
-  io.to(room.code).emit("state", roomState(room));
+  room.lastBroadcastAt = Date.now();
+  // State packets are replaceable snapshots: drop stale packets under network pressure.
+  io.to(room.code).volatile.emit("state", roomState(room));
 }
 function broadcastRoomInfo(room) {
+  const connected = [...room.players.values()].filter(isConnectedPlayer);
   io.to(room.code).emit("roomInfo", {
     code: room.code,
     hostId: room.hostId,
+    status: room.finished ? "finished" : room.started ? "playing" : "waiting",
     started: room.started,
-    count: room.players.size,
+    count: connected.length,
     maxPlayers: MAX_PLAYERS,
-    players: [...room.players.values()].map(p => ({ id: p.id, number: p.number }))
+    players: connected.map(p => ({ id: p.id, number: p.number }))
   });
 }
-function resetPlayer(p, index) {
+function resetPlayer(p, index, resetLives = false) {
   const point = spawnPoint(index);
   p.x = point.x;
   p.y = point.y;
   p.angle = index < 5 ? Math.PI / 2 : -Math.PI / 2;
   p.hp = 100;
+  if (resetLives) p.lives = 3;
+  p.eliminated = false;
   p.power = null;
   p.powerUntil = 0;
+  p.invisibleUntil = 0;
   p.input = { up: false, down: false, left: false, right: false, shoot: false };
   p.nextShot = 0;
   p.respawnAt = 0;
+  p.invulnerableUntil = Date.now() + 1000;
 }
-function randomFreePoint(room) {
-  for (let attempt = 0; attempt < 80; attempt++) {
-    const x = 70 + Math.random() * (ARENA.w - 140);
-    const y = 70 + Math.random() * (ARENA.h - 140);
-    if (hitsWall(x, y, 23)) continue;
-    if ([...room.players.values()].some(p => p.hp > 0 && Math.hypot(p.x - x, p.y - y) < 75)) continue;
-    return { x, y };
+function randomFreePoint(room, ignorePlayerId = null) {
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const x = 65 + Math.random() * (ARENA.w - 130);
+    const y = 65 + Math.random() * (ARENA.h - 130);
+    if (hitsWall(x, y, 24)) continue;
+    const occupied = [...room.players.values()].some(p =>
+      p.id !== ignorePlayerId && p.connected && p.lives > 0 &&
+      Math.hypot(p.x - x, p.y - y) < 75
+    );
+    if (!occupied) return { x, y };
   }
-  return { x: 500, y: 205 };
+  return spawnPoint(Math.floor(Math.random() * SPAWNS.length));
 }
 function spawnCrate(room) {
-  if (room.crates.length >= 2) return;
+  if (room.crates.length >= 3) return;
   const spot = randomFreePoint(room);
-  const types = ["rapid", "speed", "triple", "shield"];
+  const types = ["rapid", "speed", "triple", "shield", "invisibility", "clone", "bomb"];
   room.crateCounter++;
-  room.crates.push({ id: room.crateCounter, x: spot.x, y: spot.y, type: types[Math.floor(Math.random() * types.length)] });
+  room.crates.push({
+    id: room.crateCounter,
+    x: spot.x,
+    y: spot.y,
+    type: types[Math.floor(Math.random() * types.length)]
+  });
 }
-function createBullet(room, player, angle) {
-  const speed = 12;
+function spawnClones(room, player, now) {
+  for (let i = 0; i < 2; i++) {
+    const spot = randomFreePoint(room, player.id);
+    room.cloneCounter++;
+    room.clones.push({
+      id: room.cloneCounter,
+      owner: player.id,
+      number: player.number,
+      x: spot.x,
+      y: spot.y,
+      angle: player.angle,
+      expiresAt: now + 7500
+    });
+  }
+}
+function createProjectile(room, player, angle, type = "normal") {
+  const bomb = type === "bomb";
   room.bullets.push({
     owner: player.id,
-    x: player.x + Math.cos(angle) * 23,
-    y: player.y + Math.sin(angle) * 23,
-    vx: Math.cos(angle) * speed,
-    vy: Math.sin(angle) * speed,
-    life: 85,
-    damage: 20
+    x: player.x + Math.cos(angle) * (bomb ? 30 : 23),
+    y: player.y + Math.sin(angle) * (bomb ? 30 : 23),
+    vx: Math.cos(angle) * (bomb ? 7.2 : 12),
+    vy: Math.sin(angle) * (bomb ? 7.2 : 12),
+    life: bomb ? 105 : 75,
+    damage: bomb ? 48 : 20,
+    type
   });
+  if (room.bullets.length > MAX_BULLETS_PER_ROOM) {
+    room.bullets.splice(0, room.bullets.length - MAX_BULLETS_PER_ROOM);
+  }
+}
+function damagePlayer(room, target, amount, killerId, now) {
+  if (!target.connected || target.lives <= 0 || target.hp <= 0 || target.invulnerableUntil > now) return false;
+  const damage = target.power === "shield" && target.powerUntil > now
+    ? Math.ceil(amount * 0.5)
+    : amount;
+  target.hp = Math.max(0, target.hp - damage);
+  if (target.hp > 0) return false;
+
+  target.lives = Math.max(0, target.lives - 1);
+  target.power = null;
+  target.powerUntil = 0;
+  target.invisibleUntil = 0;
+  if (killerId && killerId !== target.id) {
+    const killer = room.players.get(killerId);
+    if (killer && killer.connected) killer.score++;
+  }
+  if (target.lives > 0) {
+    target.respawnAt = now + 1600;
+  } else {
+    target.eliminated = true;
+    target.respawnAt = 0;
+  }
+  return true;
+}
+function explodeBomb(room, bomb, now) {
+  const radius = 132;
+  room.explosions.push({
+    x: bomb.x,
+    y: bomb.y,
+    radius,
+    expiresAt: now + 520
+  });
+  for (const p of room.players.values()) {
+    if (p.id === bomb.owner || !p.connected || p.lives <= 0 || p.hp <= 0) continue;
+    const distance = Math.hypot(p.x - bomb.x, p.y - bomb.y);
+    if (distance <= radius) {
+      const falloff = Math.max(0.45, 1 - distance / (radius * 1.6));
+      damagePlayer(room, p, Math.round(bomb.damage * falloff), bomb.owner, now);
+    }
+  }
+  room.clones = room.clones.filter(c => Math.hypot(c.x - bomb.x, c.y - bomb.y) > radius);
+}
+function finishRoom(room) {
+  if (!room.started || room.finished) return;
+  const players = [...room.players.values()];
+  const survivors = players.filter(p => p.connected && p.lives > 0);
+  const winnerId = survivors.length === 1 ? survivors[0].id : null;
+  players.sort((a, b) => {
+    if (a.id === winnerId) return -1;
+    if (b.id === winnerId) return 1;
+    const aActive = a.connected && a.lives > 0 ? 1 : 0;
+    const bActive = b.connected && b.lives > 0 ? 1 : 0;
+    return bActive - aActive || b.score - a.score || b.lives - a.lives || a.number - b.number;
+  });
+  room.winnerId = winnerId;
+  room.rankings = players.slice(0, 3).map((p, index) => ({
+    position: index + 1,
+    id: p.id,
+    number: p.number,
+    score: p.score,
+    lives: p.lives,
+    winner: p.id === winnerId
+  }));
+  room.finished = true;
+  room.started = false;
+  room.bullets = [];
+  room.crates = [];
+  room.clones = [];
+  room.explosions = [];
+  broadcastRoomInfo(room);
+  broadcast(room);
+}
+function checkRoomFinished(room) {
+  if (!room.started) return;
+  const remaining = [...room.players.values()].filter(p => p.connected && p.lives > 0);
+  if (remaining.length <= 1) finishRoom(room);
 }
 function startRoom(room) {
   room.started = true;
+  room.finished = false;
+  room.winnerId = null;
+  room.rankings = [];
   room.bullets = [];
   room.crates = [];
+  room.clones = [];
+  room.explosions = [];
   room.players.forEach(p => {
     p.score = 0;
-    resetPlayer(p, p.number - 1);
+    if (p.connected) resetPlayer(p, p.number - 1, true);
+    else {
+      p.lives = 0;
+      p.hp = 0;
+      p.eliminated = true;
+    }
   });
   const now = Date.now();
-  room.nextCrateAt = now + 9000;
+  room.nextCrateAt = now + 7000;
+  room.lastBroadcastAt = 0;
   broadcastRoomInfo(room);
   broadcast(room);
 }
@@ -153,19 +304,31 @@ io.on("connection", socket => {
         players: new Map(),
         bullets: [],
         crates: [],
+        clones: [],
+        explosions: [],
+        rankings: [],
+        winnerId: null,
         crateCounter: 0,
+        cloneCounter: 0,
         nextCrateAt: 0,
-        started: false
+        lastBroadcastAt: 0,
+        started: false,
+        finished: false
       };
       rooms.set(code, room);
     }
-    if (room.started) return socket.emit("joinError", "Essa partida já começou. Crie outra sala para entrar.");
-    if (room.players.size >= MAX_PLAYERS) return socket.emit("joinError", "Sala cheia! O limite é de 10 jogadores.");
+    if (room.started || room.finished) {
+      return socket.emit("joinError", "Essa sala já está em uma partida. Aguarde uma nova sala.");
+    }
+    if ([...room.players.values()].filter(isConnectedPlayer).length >= MAX_PLAYERS) {
+      return socket.emit("joinError", "Sala cheia! O limite é de 10 jogadores.");
+    }
 
     const occupiedNumbers = new Set([...room.players.values()].map(p => p.number));
     let number = 1;
     while (occupiedNumbers.has(number) && number <= MAX_PLAYERS) number++;
     if (number > MAX_PLAYERS) return socket.emit("joinError", "Sala cheia! O limite é de 10 jogadores.");
+
     const point = spawnPoint(number - 1);
     const player = {
       id: socket.id,
@@ -174,12 +337,17 @@ io.on("connection", socket => {
       y: point.y,
       angle: 0,
       hp: 100,
+      lives: 3,
       score: 0,
+      connected: true,
+      eliminated: false,
       power: null,
       powerUntil: 0,
+      invisibleUntil: 0,
       input: { up: false, down: false, left: false, right: false, shoot: false },
       nextShot: 0,
-      respawnAt: 0
+      respawnAt: 0,
+      invulnerableUntil: 0
     };
     room.players.set(socket.id, player);
     socket.join(code);
@@ -193,7 +361,8 @@ io.on("connection", socket => {
     const room = rooms.get(socket.data.room);
     if (!room || room.started) return;
     if (room.hostId !== socket.id) return socket.emit("startError", "Somente quem criou a sala pode começar.");
-    if (room.players.size < 2) return socket.emit("startError", "É preciso ter pelo menos 2 jogadores para começar.");
+    const connectedCount = [...room.players.values()].filter(isConnectedPlayer).length;
+    if (connectedCount < 2) return socket.emit("startError", "É preciso ter pelo menos 2 jogadores para começar.");
     startRoom(room);
   });
 
@@ -201,7 +370,7 @@ io.on("connection", socket => {
     const room = rooms.get(socket.data.room);
     if (!room || !room.started) return;
     const p = room.players.get(socket.id);
-    if (!p || p.hp <= 0 || !input || typeof input !== "object") return;
+    if (!p || !p.connected || p.lives <= 0 || p.hp <= 0 || !input || typeof input !== "object") return;
     p.input = {
       up: !!input.up,
       down: !!input.down,
@@ -216,15 +385,27 @@ io.on("connection", socket => {
     const code = socket.data.room;
     const room = rooms.get(code);
     if (!room) return;
-    room.players.delete(socket.id);
-    room.bullets = room.bullets.filter(b => b.owner !== socket.id);
-    if (room.hostId === socket.id) {
-      room.hostId = room.players.keys().next().value || null;
+    const p = room.players.get(socket.id);
+    if (p) {
+      p.connected = false;
+      p.input = { up: false, down: false, left: false, right: false, shoot: false };
+      if (room.started) {
+        p.lives = 0;
+        p.hp = 0;
+        p.eliminated = true;
+      } else if (!room.finished) {
+        room.players.delete(socket.id);
+      }
     }
-    if (!room.players.size) {
+    if (room.hostId === socket.id) {
+      room.hostId = [...room.players.values()].find(candidate => candidate.connected)?.id || null;
+    }
+    const connectedCount = [...room.players.values()].filter(isConnectedPlayer).length;
+    if (!connectedCount) {
       rooms.delete(code);
       return;
     }
+    if (room.started) checkRoomFinished(room);
     broadcastRoomInfo(room);
     broadcast(room);
   });
@@ -235,10 +416,12 @@ setInterval(() => {
   for (const room of rooms.values()) {
     if (!room.started) continue;
 
-    for (const p of room.players.values()) {
+    const players = [...room.players.values()];
+    for (const p of players) {
+      if (!p.connected || p.lives <= 0) continue;
       if (p.hp <= 0) {
         if (p.respawnAt && now >= p.respawnAt) {
-          resetPlayer(p, p.number - 1);
+          resetPlayer(p, p.number - 1, false);
         }
         continue;
       }
@@ -246,32 +429,40 @@ setInterval(() => {
         p.power = null;
         p.powerUntil = 0;
       }
+      if (p.invisibleUntil <= now) p.invisibleUntil = 0;
 
       const dx = (p.input.right ? 1 : 0) - (p.input.left ? 1 : 0);
       const dy = (p.input.down ? 1 : 0) - (p.input.up ? 1 : 0);
       const length = Math.hypot(dx, dy) || 1;
-      const speed = p.power === "speed" ? 6.6 : 4.2;
+      const speed = p.power === "speed" ? 6.5 : 4.2;
       movePlayer(p, dx / length * speed, dy / length * speed);
 
-      const fireDelay = p.power === "rapid" ? 115 : 275;
+      let fireDelay = 275;
+      if (p.power === "rapid") fireDelay = 125;
+      else if (p.power === "triple") fireDelay = 330;
+      else if (p.power === "bomb") fireDelay = 850;
       if (p.input.shoot && now >= p.nextShot) {
         p.nextShot = now + fireDelay;
         if (p.power === "triple") {
-          createBullet(room, p, p.angle - 0.22);
-          createBullet(room, p, p.angle);
-          createBullet(room, p, p.angle + 0.22);
+          createProjectile(room, p, p.angle - 0.2);
+          createProjectile(room, p, p.angle);
+          createProjectile(room, p, p.angle + 0.2);
         } else {
-          createBullet(room, p, p.angle);
+          createProjectile(room, p, p.angle, p.power === "bomb" ? "bomb" : "normal");
         }
       }
 
       for (let i = room.crates.length - 1; i >= 0; i--) {
         const crate = room.crates[i];
-        if (Math.hypot(p.x - crate.x, p.y - crate.y) < 27) {
-          p.power = crate.type;
-          p.powerUntil = now + 9000;
-          room.crates.splice(i, 1);
+        if (Math.hypot(p.x - crate.x, p.y - crate.y) >= 30) continue;
+        p.power = crate.type;
+        p.powerUntil = now + POWER_DURATION;
+        if (crate.type === "invisibility") p.invisibleUntil = now + 7800;
+        if (crate.type === "clone") {
+          spawnClones(room, p, now);
+          p.powerUntil = now + 3000;
         }
+        room.crates.splice(i, 1);
       }
     }
 
@@ -281,36 +472,72 @@ setInterval(() => {
       bullet.x += bullet.vx;
       bullet.y += bullet.vy;
       bullet.life--;
-      if (hitsWall(bullet.x, bullet.y, BULLET_RADIUS) ||
-          WALLS.some(w => circleHitsRect((oldX + bullet.x) / 2, (oldY + bullet.y) / 2, BULLET_RADIUS + 6, w))) {
+
+      if (bullet.type === "bomb") {
+        let impact = hitsWall(bullet.x, bullet.y, 8) ||
+          bullet.x < 12 || bullet.x > ARENA.w - 12 || bullet.y < 12 || bullet.y > ARENA.h - 12;
+        if (!impact) {
+          for (const target of players) {
+            if (target.id === bullet.owner || !target.connected || target.lives <= 0 || target.hp <= 0) continue;
+            if (Math.hypot(target.x - bullet.x, target.y - bullet.y) < PLAYER_RADIUS + 9) {
+              impact = true;
+              break;
+            }
+          }
+        }
+        if (impact || bullet.life <= 0) {
+          explodeBomb(room, bullet, now);
+          bullet.life = 0;
+        }
+        continue;
+      }
+
+      const hitWall = hitsWall(bullet.x, bullet.y, BULLET_RADIUS) ||
+        WALLS.some(w => circleHitsRect((oldX + bullet.x) / 2, (oldY + bullet.y) / 2, BULLET_RADIUS + 6, w));
+      if (hitWall) {
         bullet.life = 0;
         continue;
       }
-      for (const target of room.players.values()) {
-        if (target.id === bullet.owner || target.hp <= 0) continue;
-        if (Math.hypot(target.x - bullet.x, target.y - bullet.y) < PLAYER_RADIUS + BULLET_RADIUS + 2) {
-          const damage = target.power === "shield" ? Math.ceil(bullet.damage * 0.5) : bullet.damage;
-          target.hp = Math.max(0, target.hp - damage);
+
+      let hit = false;
+      for (let i = room.clones.length - 1; i >= 0; i--) {
+        const clone = room.clones[i];
+        if (clone.owner === bullet.owner) continue;
+        if (Math.hypot(clone.x - bullet.x, clone.y - bullet.y) < PLAYER_RADIUS + BULLET_RADIUS) {
+          room.clones.splice(i, 1);
           bullet.life = 0;
-          if (target.hp === 0) {
-            const shooter = room.players.get(bullet.owner);
-            if (shooter) shooter.score++;
-            target.respawnAt = now + 1600;
-          }
+          hit = true;
+          break;
+        }
+      }
+      if (hit) continue;
+
+      for (const target of players) {
+        if (target.id === bullet.owner || !target.connected || target.lives <= 0 || target.hp <= 0) continue;
+        if (Math.hypot(target.x - bullet.x, target.y - bullet.y) < PLAYER_RADIUS + BULLET_RADIUS + 2) {
+          damagePlayer(room, target, bullet.damage, bullet.owner, now);
+          bullet.life = 0;
           break;
         }
       }
     }
-    room.bullets = room.bullets.filter(b => b.life > 0 && b.x > 0 && b.x < ARENA.w && b.y > 0 && b.y < ARENA.h);
+    room.bullets = room.bullets.filter(b =>
+      b.life > 0 && b.x > 0 && b.x < ARENA.w && b.y > 0 && b.y < ARENA.h
+    );
+    room.clones = room.clones.filter(c => c.expiresAt > now);
+    room.explosions = room.explosions.filter(e => e.expiresAt > now);
 
     if (now >= room.nextCrateAt) {
       spawnCrate(room);
       room.nextCrateAt = now + 15000 + Math.random() * 9000;
     }
 
-    broadcast(room);
+    checkRoomFinished(room);
+    if (room.started && now - room.lastBroadcastAt >= SNAPSHOT_MS) {
+      broadcast(room);
+    }
   }
-}, 1000 / 30);
+}, TICK_MS);
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log("DUEL ARENA online em http://localhost:" + PORT));
+server.listen(PORT, "0.0.0.0", () => console.log("DUEL ARENA online em http://localhost:" + PORT));
