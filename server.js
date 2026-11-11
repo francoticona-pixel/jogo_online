@@ -80,13 +80,13 @@ function roomState(room) {
       power: p.powerUntil > now ? p.power : null,
       powerLeft: p.powerUntil > now ? p.powerUntil - now : 0,
       invisible: p.invisibleUntil > now,
+      invulnerableLeft: Math.max(0, p.invulnerableUntil - now),
       name: p.name || ("OP " + String(p.number).padStart(2,"0")),
       skin: p.skin || "classic"
     })),
     bullets: room.bullets.map(b => ({
       id: b.id, x: b.x, y: b.y, vx: b.vx, vy: b.vy, type: b.type, fuseLeft: b.fuseAt ? Math.max(0,b.fuseAt-now) : 0
     })),
-    invulnerable: Object.fromEntries([...room.players.values()].map(p => [p.id, Math.max(0, p.invulnerableUntil - now)])),
     crates: room.crates.map(c => ({ id: c.id, x: c.x, y: c.y, type: c.type })),
     clones: room.clones.map(c => ({
       id: c.id, owner: c.owner, number: c.number, x: c.x, y: c.y, angle: c.angle
