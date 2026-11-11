@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DUEL ARENA | Tactical Combat</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <header><div class="brand-mark">DA</div><div><p class="eyebrow">COMBATE TÁTICO • MULTIPLAYER</p><h1>DUEL <span>ARENA</span></h1></div><div class="online"><i></i> SERVIDOR PRONTO</div></header>
+    <section id="lobby" class="panel lobby">
+      <div class="lobby-copy"><p class="eyebrow">OPERAÇÃO 01 / X1</p><h2>Entre na arena.</h2><p>Crie uma sala com um código e compartilhe com seu adversário. Dois operadores. Uma vitória.</p></div>
+      <form id="joinForm">
+        <label for="roomCode">CÓDIGO DA SALA</label>
+        <input id="roomCode" maxlength="8" placeholder="EX: ALFA01" autocomplete="off" required>
+        <button type="submit">ENTRAR NA PARTIDA <b>→</b></button>
+        <small>Os dois jogadores devem usar exatamente o mesmo código.</small>
+      </form>
+      <div id="joinError" class="error"></div>
+    </section>
+    <section id="gamePanel" class="game-panel hidden">
+      <div class="hud"><div><span class="eyebrow">SALA</span><strong id="roomLabel">----</strong></div><div class="status" id="gameStatus">AGUARDANDO OPONENTE</div><div><span class="eyebrow">VOCÊ</span><strong id="playerLabel">JOGADOR</strong></div></div>
+      <div class="arena-wrap"><canvas id="arena" width="1000" height="620"></canvas><div id="waiting" class="waiting"><strong>AGUARDANDO SEGUNDO JOGADOR</strong><span>Envie o código da sala para seu amigo.</span></div></div>
+      <div class="bottom-hud"><div class="health"><span>VIDA</span><div><i id="healthFill"></i></div><b id="healthText">100%</b></div><div class="score" id="scoreText">PLACAR&nbsp; 0 — 0</div><button id="copyCode" class="secondary">COPIAR CÓDIGO</button></div>
+      <p class="controls">MOVIMENTO: <b>W A S D</b> &nbsp; • &nbsp; MIRAR: <b>MOUSE</b> &nbsp; • &nbsp; ATIRAR: <b>CLIQUE ESQUERDO</b></p>
+    </section>
+    <footer><span>DUEL ARENA // PROTÓTIPO 0.1</span><span>JOGUE COM RESPEITO. LUTE PELA VITÓRIA.</span></footer>
+  </main>
+  <script src="/socket.io/socket.io.js"></script><script src="game.js"></script>
+</body>
+</html>
