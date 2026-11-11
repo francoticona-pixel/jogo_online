@@ -10,6 +10,7 @@ const ARENA = { w: 1600, h: 1000 };
 const ZOOM = 0.78;
 let camera = { x: 800, y: 500 };
 const renderedPlayers = new Map();
+const renderedBullets = new Map();
 const powers = {
   rapid: { label: "TIRO RÁPIDO", icon: "»", color: "#f0bb62" },
   speed: { label: "VELOCIDADE", icon: "⚡", color: "#62c3dc" },
@@ -192,15 +193,22 @@ function drawPlayers(dt){
     ctx.globalAlpha=1;
   }
 }
-function drawBullets(){
+function drawBullets(dt){
+  const active = new Set();
   for(const b of state.bullets||[]){
-    ctx.save();ctx.translate(b.x,b.y);ctx.rotate(Math.atan2(b.vy,b.vx));
+    active.add(b.id);
+    let r=renderedBullets.get(b.id);
+    if(!r){r={x:b.x,y:b.y};renderedBullets.set(b.id,r);}
+    const k=Math.min(.72,dt/55);
+    r.x+=(b.x-r.x)*k;r.y+=(b.y-r.y)*k;
+    ctx.save();ctx.translate(r.x,r.y);ctx.rotate(Math.atan2(b.vy,b.vx));
     const bomb=b.type==="bomb";
     ctx.shadowColor=bomb?"#ff765c":"#ffe49a";ctx.shadowBlur=bomb?22:15;
     ctx.strokeStyle=bomb?"#ff8c68":"#fff4c7";ctx.lineWidth=bomb?8:4;
     ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(7,0);ctx.stroke();
     ctx.fillStyle=bomb?"#ff5d43":"#f2c96b";ctx.beginPath();ctx.arc(0,0,bomb?7:4,0,Math.PI*2);ctx.fill();ctx.restore();
   }
+  for(const id of renderedBullets.keys()) if(!active.has(id)) renderedBullets.delete(id);
 }
 function drawClones(){
   for(const c of state.clones||[]){
@@ -223,12 +231,16 @@ let previousFrame=performance.now();
 function draw(){
   const now=performance.now(),dt=Math.min(40,now-previousFrame);previousFrame=now;
   const me=state.players.find(p=>p.id===myId);
-  if(me&&me.connected){camera.x+=(me.x-camera.x)*.12;camera.y+=(me.y-camera.y)*.12;}
-  else if(!myId){camera.x+=(800-camera.x)*.08;camera.y+=(500-camera.y)*.08;}
+  if(me&&me.connected){
+    const viewW=canvas.width/ZOOM, viewH=canvas.height/ZOOM;
+    const targetX=Math.max(viewW/2,Math.min(ARENA.w-viewW/2,me.x));
+    const targetY=Math.max(viewH/2,Math.min(ARENA.h-viewH/2,me.y));
+    camera.x+=(targetX-camera.x)*.14;camera.y+=(targetY-camera.y)*.14;
+  } else if(!myId){camera.x+=(800-camera.x)*.08;camera.y+=(500-camera.y)*.08;}
   ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle="#101a17";ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.setTransform(ZOOM,0,0,ZOOM,canvas.width/2-camera.x*ZOOM,canvas.height/2-camera.y*ZOOM);
   ctx.drawImage(mapCanvas,0,0);
-  drawCrates();drawClones();drawExplosions();drawBullets();drawPlayers(dt);
+  drawCrates();drawClones();drawExplosions();drawBullets(dt);drawPlayers(dt);
   ctx.setTransform(1,0,0,1,0,0);
   requestAnimationFrame(draw);
 }
