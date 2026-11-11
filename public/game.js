@@ -5,6 +5,11 @@ let myId = null, myNumber = 0, roomCode = "";
 let state = { players: [], bullets: [], crates: [], clones: [], explosions: [], status: "waiting" };
 let roomInfo = { players: [], count: 0, maxPlayers: 10, hostId: null, started: false };
 let mouse = { x: 800, y: 500 }, shooting = false;
+let audioContext=null,lastShotSound=0,lastPowerSound=null,lastWinnerSound=false,lastExplosionCount=0;
+function playTone(freq=440,duration=.09,type="sine",volume=.035){
+  try{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;audioContext=audioContext||new AC();if(audioContext.state==="suspended")audioContext.resume();const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=type;osc.frequency.setValueAtTime(freq,audioContext.currentTime);gain.gain.setValueAtTime(volume,audioContext.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+duration);osc.connect(gain);gain.connect(audioContext.destination);osc.start();osc.stop(audioContext.currentTime+duration);}catch{}
+}
+function playSound(kind){if(kind==="shot")playTone(150,.045,"square",.012);if(kind==="power"){playTone(520,.09,"sine",.04);setTimeout(()=>playTone(780,.13,"sine",.035),75);}if(kind==="explosion"){playTone(85,.24,"sawtooth",.05);}if(kind==="win"){playTone(523,.15,"triangle",.05);setTimeout(()=>playTone(659,.15,"triangle",.05),130);setTimeout(()=>playTone(784,.28,"triangle",.05),260);}if(kind==="flame")playTone(95,.06,"sawtooth",.012);}
 const keys = Object.create(null);
 const ARENA = { w: 2000, h: 1300 };
 const ZOOM = 0.78;
@@ -169,6 +174,15 @@ socket.on("state", s => {
   $("scoreText").textContent = "ELIMINAÇÕES  " + scores.slice(0,3).map(p=>"OP"+p.number+" "+p.score).join("  •  ");
   if (s.status === "finished") showResults(s.rankings || []);
   else $("matchResult").classList.add("hidden");
+  const activePower=me?.power||null;
+  if(activePower && activePower!==lastPowerSound)playSound("power");
+  lastPowerSound=activePower;
+  const explosions=s.explosions?.length||0;if(explosions>lastExplosionCount)playSound("explosion");lastExplosionCount=explosions;
+});
+socket.on("winner", data=>{
+  const banner=$("winnerBanner");
+  if(banner){banner.textContent=(data?.name||"OPERADOR")+" GANHOU!";banner.classList.remove("hidden");}
+  if(!lastWinnerSound){playSound("win");lastWinnerSound=true;}
 });
 function showResults(rankings) {
   $("matchResult").classList.remove("hidden");
@@ -182,7 +196,7 @@ function showResults(rankings) {
     row.append(medal,name,stats); $("podiumList").appendChild(row);
   });
   const champion=rankings[0];
-  $("resultTitle").textContent=champion?.winner ? "VITÓRIA — "+(champion.name||"OPERADOR") : champion ? "TOP 1 — "+(champion.name||"OPERADOR") : "PARTIDA ENCERRADA";
+  $("resultTitle").textContent=champion ? (champion.name||"OPERADOR")+" GANHOU!" : "PARTIDA ENCERRADA";
 }
 $("returnLobby").addEventListener("click",()=>location.reload());
 document.addEventListener("fullscreenchange",()=>{document.body.classList.toggle("playing-fullscreen",!!document.fullscreenElement);});
@@ -212,6 +226,7 @@ setInterval(()=>{
     left:!!(keys.a||keys.arrowleft),right:!!(keys.d||keys.arrowright),
     angle:Math.atan2(worldMouse.y-me.y,worldMouse.x-me.x),shoot:shooting
   });
+  if(shooting && performance.now()-lastShotSound>95){playSound(me.power==="flame"?"flame":"shot");lastShotSound=performance.now();}
 },33);
 
 function screenToWorld(x,y){
@@ -236,7 +251,10 @@ function drawPlayers(dt){
     if(!r){r={x:p.x,y:p.y,angle:p.angle};renderedPlayers.set(p.id,r);}
     const k=1-Math.exp(-dt/(p.id===myId?34:62));
     r.x+=(p.x-r.x)*k;r.y+=(p.y-r.y)*k;
-    let da=p.angle-r.angle;while(da>Math.PI)da-=Math.PI*2;while(da<-Math.PI)da+=Math.PI*2;r.angle+=da*k;
+    let targetAngle=p.angle;
+    if(p.id===myId){const aim=screenToWorld(mouse.x,mouse.y);targetAngle=Math.atan2(aim.y-r.y,aim.x-r.x);}
+    let da=targetAngle-r.angle;while(da>Math.PI)da-=Math.PI*2;while(da<-Math.PI)da+=Math.PI*2;
+    if(p.id===myId)r.angle=targetAngle;else r.angle+=da*k;
     const color=skinStyles[p.skin]||playerColors[(p.number-1)%playerColors.length];
     const hidden=p.invisible&&p.id!==myId;
     ctx.save();ctx.translate(r.x,r.y);ctx.rotate(r.angle);
@@ -278,10 +296,16 @@ function drawBullets(dt){
     r.x+=(b.x-r.x)*k;r.y+=(b.y-r.y)*k;
     ctx.save();ctx.translate(r.x,r.y);ctx.rotate(Math.atan2(b.vy,b.vx));
     const bomb=b.type==="bomb", flame=b.type==="flame";
-    ctx.shadowColor=bomb?"#ff765c":flame?"#ff5a24":"#ffe49a";ctx.shadowBlur=bomb?22:flame?20:15;
-    ctx.strokeStyle=bomb?"#ff8c68":flame?"#ff6b32":"#fff4c7";ctx.lineWidth=bomb?8:flame?10:4;
-    ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(7,0);ctx.stroke();
-    ctx.fillStyle=bomb?"#ff5d43":flame?"#ffd15a":"#f2c96b";ctx.beginPath();ctx.arc(0,0,bomb?7:flame?8:4,0,Math.PI*2);ctx.fill();
+    if(flame){
+      const flicker=.78+Math.sin(performance.now()/32+b.id)*.22;
+      const fire=ctx.createLinearGradient(-34,0,15,0);fire.addColorStop(0,"rgba(255,45,12,0)");fire.addColorStop(.35,"#ff4a16");fire.addColorStop(.72,"#ffb12f");fire.addColorStop(1,"#fff2a0");
+      ctx.shadowColor="#ff4a16";ctx.shadowBlur=22;ctx.fillStyle=fire;ctx.beginPath();ctx.moveTo(-34,-7*flicker);ctx.quadraticCurveTo(-8,-13*flicker,16,0);ctx.quadraticCurveTo(-8,13*flicker,-34,7*flicker);ctx.closePath();ctx.fill();
+      ctx.strokeStyle="rgba(255,235,145,.9)";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-22,0);ctx.quadraticCurveTo(-3,-3*flicker,13,0);ctx.stroke();
+    }else{
+      ctx.shadowColor=bomb?"#ff765c":"#ffe49a";ctx.shadowBlur=bomb?22:15;
+      ctx.strokeStyle=bomb?"#ff8c68":"#fff4c7";ctx.lineWidth=bomb?8:4;ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(7,0);ctx.stroke();
+      ctx.fillStyle=bomb?"#ff5d43":"#f2c96b";ctx.beginPath();ctx.arc(0,0,bomb?7:4,0,Math.PI*2);ctx.fill();
+    }
     if(bomb && b.fuseLeft>0){ctx.rotate(-Math.atan2(b.vy,b.vx));ctx.fillStyle="#fff";ctx.font="bold 11px monospace";ctx.textAlign="center";ctx.fillText((b.fuseLeft/1000).toFixed(1)+"s",0,-15);}
     ctx.restore();
   }
@@ -336,6 +360,5 @@ function draw(){
   if(state.gas && state.gas.remaining>0){ctx.save();ctx.fillStyle="rgba(144,205,83,.23)";ctx.beginPath();ctx.rect(0,0,ARENA.w,ARENA.h);ctx.arc(state.gas.x,state.gas.y,state.gas.radius,0,Math.PI*2,true);ctx.fill("evenodd");ctx.strokeStyle="rgba(188,235,110,.9)";ctx.lineWidth=8;ctx.beginPath();ctx.arc(state.gas.x,state.gas.y,state.gas.radius,0,Math.PI*2);ctx.stroke();ctx.restore();}
   drawCrates();drawClones();drawExplosions();drawBullets(dt);drawPlayers(dt);
   ctx.setTransform(1,0,0,1,0,0);
-  if(state.status!=="finished") requestAnimationFrame(draw);
-  else rendering=false;
+  requestAnimationFrame(draw);
 }
