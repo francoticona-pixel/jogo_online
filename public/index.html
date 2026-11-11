@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>DUEL ARENA | Tactical Combat</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=duel-2">
 </head>
 <body>
   <main class="shell">
@@ -83,17 +83,24 @@
       </div>
       <div class="bottom-hud">
         <div class="health"><span>VIDA</span><div><i id="healthFill"></i></div><b id="healthText">100%</b></div>
-        <div class="score" id="scoreText">PLACAR&nbsp; —</div>
+        <div class="lives-count">VIDAS <strong id="livesText">3</strong></div>
+        <div class="score" id="scoreText">ELIMINAÇÕES&nbsp; —</div>
         <div id="powerHud" class="power-hud">SEM PODER</div>
         <button id="copyCode" class="secondary">COPIAR CÓDIGO</button>
       </div>
-      <p class="controls">MOVIMENTO: <b>W A S D</b> &nbsp; • &nbsp; MIRAR: <b>MOUSE</b> &nbsp; • &nbsp; ATIRAR: <b>CLIQUE ESQUERDO</b> &nbsp; • &nbsp; CAIXAS: <b>ENCOSTE PARA PEGAR</b></p>
+      <p class="controls">W A S D: <b>MOVER</b> &nbsp; • &nbsp; MOUSE: <b>MIRAR</b> &nbsp; • &nbsp; CLIQUE: <b>ATIRAR</b> &nbsp; • &nbsp; CAIXAS: <b>PEGAR PODERES</b> &nbsp; • &nbsp; PARTIDA: <b>3 VIDAS</b></p>
+      <div id="matchResult" class="match-result hidden">
+        <p class="eyebrow">RELATÓRIO FINAL DA PARTIDA</p>
+        <h2 id="resultTitle">VITÓRIA!</h2>
+        <div id="podiumList" class="podium-list"></div>
+        <button id="returnLobby" type="button">VOLTAR AO MENU</button>
+      </div>
     </section>
 
     <footer><span>DUEL ARENA // MULTIPLAYER 0.3</span><span>JOGUE COM RESPEITO. LUTE PELA VITÓRIA.</span></footer>
   </main>
   <script src="/socket.io/socket.io.js"></script>
-  <script src="game.js"></script>
-  <script src="adventure.js"></script>
+  <script src="game.js?v=duel-2"></script>
+  <script src="adventure.js?v=duel-1"></script>
 </body>
 </html>
