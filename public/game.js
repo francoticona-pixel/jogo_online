@@ -152,7 +152,6 @@ socket.on("state", s => {
     $("livesText").textContent = String(me.lives);
     $("livesText").style.color = me.lives === 1 ? "#e46d5c" : "";
     const power = me.power && powers[me.power];
-    $("powerHud").textContent = power ? power.label + "  " + Math.ceil(me.powerLeft / 1000) + "s" : "SEM PODER";
     $("powerHud").textContent = me.invulnerableLeft > 0 ? "ESCUDO " + Math.ceil(me.invulnerableLeft / 1000) + "s" : power ? power.label + "  " + Math.ceil(me.powerLeft / 1000) + "s" : "SEM PODER";
     $("powerHud").style.color = me.invulnerableLeft > 0 ? "#f7f3c2" : power ? power.color : "";
   }
@@ -303,7 +302,7 @@ function draw(){
   if(me&&me.connected){
     const targetX=Math.max(viewW/2,Math.min(ARENA.w-viewW/2,me.x));
     const targetY=Math.max(viewH/2,Math.min(ARENA.h-viewH/2,me.y));
-    camera.x+=(targetX-camera.x)*.14;camera.y+=(targetY-camera.y)*.14;
+    const follow=1-Math.exp(-dt/90);camera.x+=(targetX-camera.x)*follow;camera.y+=(targetY-camera.y)*follow;
   } else if(!myId){camera.x+=(800-camera.x)*.08;camera.y+=(500-camera.y)*.08;}
   ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle="#101a17";ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.setTransform(ZOOM,0,0,ZOOM,canvas.width/2-camera.x*ZOOM,canvas.height/2-camera.y*ZOOM);
