@@ -153,7 +153,8 @@ socket.on("state", s => {
     $("livesText").style.color = me.lives === 1 ? "#e46d5c" : "";
     const power = me.power && powers[me.power];
     $("powerHud").textContent = power ? power.label + "  " + Math.ceil(me.powerLeft / 1000) + "s" : "SEM PODER";
-    $("powerHud").style.color = power ? power.color : "";
+    $("powerHud").textContent = me.invulnerableLeft > 0 ? "ESCUDO " + Math.ceil(me.invulnerableLeft / 1000) + "s" : power ? power.label + "  " + Math.ceil(me.powerLeft / 1000) + "s" : "SEM PODER";
+    $("powerHud").style.color = me.invulnerableLeft > 0 ? "#f7f3c2" : power ? power.color : "";
   }
   const scores = [...s.players].sort((a,b)=>b.score-a.score||b.lives-a.lives||a.number-b.number);
   $("scoreText").textContent = "ELIMINAÇÕES  " + scores.slice(0,3).map(p=>"OP"+p.number+" "+p.score).join("  •  ");
@@ -231,7 +232,7 @@ function drawPlayers(dt){
     const hidden=p.invisible&&p.id!==myId;
     ctx.save();ctx.translate(r.x,r.y);ctx.rotate(r.angle);
     ctx.globalAlpha=hidden ? 0.16 : 1;
-    if(p.power==="shield" || p.invulnerableLeft>0){ctx.strokeStyle=p.invulnerableLeft>0?"#f7f3c2":powers.shield.color;ctx.lineWidth=3;ctx.globalAlpha=.85;ctx.beginPath();ctx.arc(0,0,p.invulnerableLeft>0?31:27,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=hidden?.22:1;}
+    if(p.power==="shield" || p.invulnerableLeft>0){ctx.strokeStyle=p.invulnerableLeft>0?"#f7f3c2":powers.shield.color;ctx.lineWidth=3;ctx.globalAlpha=.85;ctx.beginPath();ctx.arc(0,0,p.invulnerableLeft>0?31:27,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=hidden ? .22 : 1;}
     ctx.shadowColor=color;ctx.shadowBlur=0;
     ctx.fillStyle="#080d12";ctx.beginPath();ctx.roundRect(-23,-18,47,36,8);ctx.fill();
     ctx.shadowBlur=0;ctx.fillStyle="#29333a";ctx.fillRect(-20,-16,42,5);ctx.fillRect(-20,11,42,5);
