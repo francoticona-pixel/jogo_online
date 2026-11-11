@@ -60,3 +60,7 @@ body.playing-fullscreen{overflow:hidden}
 #mapPreview{display:block;width:100%;height:auto;max-height:112px;margin-top:8px;border:1px solid #52614b;background:#101a17}
 .map-choice{min-width:0}
 .customize-row select{min-height:40px}
+
+/* Aviso de vitória sincronizado para todos os participantes */
+.winner-banner{position:absolute;z-index:7;left:50%;top:50%;transform:translate(-50%,-50%);width:min(90%,680px);padding:24px 18px;text-align:center;background:rgba(8,15,10,.94);border:2px solid var(--lime);box-shadow:0 0 35px #c5e36b55;color:var(--lime);font:900 clamp(30px,6vw,64px) 'Barlow Condensed';letter-spacing:2px;text-shadow:0 0 18px #c5e36b66;pointer-events:none}
+.winner-banner.hidden{display:none!important}
