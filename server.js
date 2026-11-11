@@ -11,7 +11,7 @@ const io = new Server(server, {
 app.use(express.static("public"));
 
 const rooms = new Map();
-const ARENA = { w: 1600, h: 1000 };
+const ARENA = { w: 2000, h: 1300 };
 const MAX_PLAYERS = 10;
 const PLAYER_RADIUS = 17;
 const BULLET_RADIUS = 4;
@@ -22,24 +22,20 @@ const POWER_DURATION = 10000;
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
 const WALLS = [
-  { x: 300, y: 200, w: 180, h: 55 },
-  { x: 1120, y: 200, w: 180, h: 55 },
-  { x: 300, y: 745, w: 180, h: 55 },
-  { x: 1120, y: 745, w: 180, h: 55 },
-  { x: 755, y: 350, w: 90, h: 300 },
-  { x: 155, y: 430, w: 90, h: 130 },
-  { x: 1355, y: 430, w: 90, h: 130 },
-  { x: 600, y: 150, w: 400, h: 42 },
-  { x: 600, y: 808, w: 400, h: 42 },
-  { x: 540, y: 445, w: 150, h: 75 },
-  { x: 910, y: 480, w: 150, h: 75 },
-  { x: 520, y: 615, w: 120, h: 55 },
-  { x: 960, y: 350, w: 120, h: 55 }
+  { x: 250, y: 250, w: 250, h: 70 }, { x: 1500, y: 250, w: 250, h: 70 },
+  { x: 250, y: 980, w: 250, h: 70 }, { x: 1500, y: 980, w: 250, h: 70 },
+  { x: 920, y: 250, w: 160, h: 260 }, { x: 920, y: 790, w: 160, h: 260 },
+  { x: 500, y: 520, w: 210, h: 90 }, { x: 1290, y: 690, w: 210, h: 90 },
+  { x: 720, y: 850, w: 110, h: 190 }, { x: 1170, y: 260, w: 110, h: 190 },
+  { x: 350, y: 650, w: 90, h: 250 }, { x: 1560, y: 430, w: 90, h: 250 },
+  { x: 720, y: 390, w: 150, h: 55 }, { x: 1130, y: 855, w: 150, h: 55 },
+  { x: 850, y: 620, w: 100, h: 70 }, { x: 1050, y: 620, w: 100, h: 70 },
+  { x: 560, y: 850, w: 80, h: 80 }, { x: 1360, y: 370, w: 80, h: 80 }
 ];
 
 const SPAWNS = [
-  { x: 120, y: 120 }, { x: 450, y: 120 }, { x: 800, y: 110 }, { x: 1150, y: 120 }, { x: 1480, y: 120 },
-  { x: 120, y: 880 }, { x: 450, y: 880 }, { x: 800, y: 890 }, { x: 1150, y: 880 }, { x: 1480, y: 880 }
+  { x: 300, y: 300 }, { x: 700, y: 230 }, { x: 1000, y: 250 }, { x: 1300, y: 230 }, { x: 1700, y: 300 },
+  { x: 300, y: 1000 }, { x: 700, y: 1070 }, { x: 1000, y: 1050 }, { x: 1300, y: 1070 }, { x: 1700, y: 1000 }
 ];
 
 function circleHitsRect(x, y, radius, rect) {
@@ -90,6 +86,7 @@ function roomState(room) {
     bullets: room.bullets.map(b => ({
       id: b.id, x: b.x, y: b.y, vx: b.vx, vy: b.vy, type: b.type, fuseLeft: b.fuseAt ? Math.max(0,b.fuseAt-now) : 0
     })),
+    invulnerable: Object.fromEntries([...room.players.values()].map(p => [p.id, Math.max(0, p.invulnerableUntil - now)])),
     crates: room.crates.map(c => ({ id: c.id, x: c.x, y: c.y, type: c.type })),
     clones: room.clones.map(c => ({
       id: c.id, owner: c.owner, number: c.number, x: c.x, y: c.y, angle: c.angle
@@ -121,8 +118,8 @@ function broadcastRoomInfo(room) {
     players: connected.map(p => ({ id: p.id, number: p.number, name: p.name, skin: p.skin }))
   });
 }
-function resetPlayer(p, index, resetLives = false) {
-  const point = spawnPoint(index);
+function resetPlayer(p, index, resetLives = false, room = null) {
+  const point = room ? randomRespawnPoint(room, p.id) : spawnPoint(index);
   p.x = point.x;
   p.y = point.y;
   p.angle = index < 5 ? Math.PI / 2 : -Math.PI / 2;
@@ -135,20 +132,33 @@ function resetPlayer(p, index, resetLives = false) {
   p.input = { up: false, down: false, left: false, right: false, shoot: false };
   p.nextShot = 0;
   p.respawnAt = 0;
-  p.invulnerableUntil = Date.now() + 1000;
+  p.invulnerableUntil = Date.now() + 3000;
 }
-function randomFreePoint(room, ignorePlayerId = null) {
-  for (let attempt = 0; attempt < 100; attempt++) {
-    const x = 65 + Math.random() * (ARENA.w - 130);
-    const y = 65 + Math.random() * (ARENA.h - 130);
-    if (hitsWall(x, y, 24)) continue;
+function randomRespawnPoint(room, ignorePlayerId = null) {
+  const gas = room.gas;
+  const safeRadius = gas ? Math.max(80, gas.radius - 65) : Infinity;
+  for (let attempt = 0; attempt < 260; attempt++) {
+    const x = 55 + Math.random() * (ARENA.w - 110);
+    const y = 55 + Math.random() * (ARENA.h - 110);
+    if (hitsWall(x, y, 25)) continue;
+    if (gas && Math.hypot(x - gas.x, y - gas.y) > safeRadius) continue;
     const occupied = [...room.players.values()].some(p =>
-      p.id !== ignorePlayerId && p.connected && p.lives > 0 &&
-      Math.hypot(p.x - x, p.y - y) < 75
+      p.id !== ignorePlayerId && p.connected && p.lives > 0 && p.hp > 0 &&
+      Math.hypot(p.x - x, p.y - y) < 145
     );
     if (!occupied) return { x, y };
   }
-  return spawnPoint(Math.floor(Math.random() * SPAWNS.length));
+  for (let radius = 80; radius <= safeRadius; radius += 55) {
+    for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 12) {
+      const x = clamp(gas ? gas.x + Math.cos(angle) * radius : ARENA.w / 2 + Math.cos(angle) * radius, 35, ARENA.w - 35);
+      const y = clamp(gas ? gas.y + Math.sin(angle) * radius : ARENA.h / 2 + Math.sin(angle) * radius, 35, ARENA.h - 35);
+      if (!hitsWall(x, y, 25) && (!gas || Math.hypot(x-gas.x,y-gas.y) <= safeRadius)) return {x,y};
+    }
+  }
+  return { x: ARENA.w / 2, y: ARENA.h / 2 };
+}
+function randomFreePoint(room, ignorePlayerId = null) {
+  return randomRespawnPoint(room, ignorePlayerId);
 }
 function spawnCrate(room) {
   if (room.crates.length >= 3) return;
@@ -290,7 +300,7 @@ function startRoom(room) {
   room.crates = [];
   room.clones = [];
   room.explosions = [];
-  room.gas = { x: ARENA.w / 2, y: ARENA.h / 2, radius: 760, startAt: Date.now() + 18000, endsAt: Date.now() + 198000 };
+  room.gas = { x: ARENA.w / 2, y: ARENA.h / 2, radius: 1050, startAt: Date.now() + 18000, endsAt: Date.now() + 198000 };
   room.players.forEach(p => {
     p.score = 0;
     if (p.connected) resetPlayer(p, p.number - 1, true);
@@ -446,7 +456,7 @@ setInterval(() => {
       if (!p.connected || p.lives <= 0) continue;
       if (p.hp <= 0) {
         if (p.respawnAt && now >= p.respawnAt) {
-          resetPlayer(p, p.number - 1, false);
+          resetPlayer(p, p.number - 1, false, room);
         }
         continue;
       }
@@ -459,7 +469,7 @@ setInterval(() => {
       const dx = (p.input.right ? 1 : 0) - (p.input.left ? 1 : 0);
       const dy = (p.input.down ? 1 : 0) - (p.input.up ? 1 : 0);
       const length = Math.hypot(dx, dy) || 1;
-      const speed = p.power === "speed" ? 7.1 : 5.1;
+      const speed = p.power === "speed" ? 7.8 : 6.2;
       movePlayer(p, dx / length * speed, dy / length * speed);
 
       let fireDelay = 275;
@@ -573,7 +583,7 @@ setInterval(() => {
 
     if (room.gas && now >= room.gas.startAt) {
       const progress = clamp((now-room.gas.startAt)/(room.gas.endsAt-room.gas.startAt),0,1);
-      room.gas.radius = 760-progress*650;
+      room.gas.radius = 1050-progress*890;
       for (const p of players) if (p.connected && p.lives>0 && p.hp>0 && Math.hypot(p.x-room.gas.x,p.y-room.gas.y)>room.gas.radius) damagePlayer(room,p,0.22,null,now);
     }
     if (now >= room.nextCrateAt) {
