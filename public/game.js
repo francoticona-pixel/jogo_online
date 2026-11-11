@@ -67,7 +67,7 @@ socket.on("joined", data => {
   myId = data.playerId; myNumber = data.playerNumber; roomCode = data.code;
   $("roomLabel").textContent = roomCode;
   $("playerLabel").textContent = "OPERADOR " + String(myNumber).padStart(2, "0");
-  lobby.classList.add("hidden"); gamePanel.classList.remove("hidden");
+  lobby.classList.add("hidden"); gamePanel.classList.remove("hidden"); startRender();
 });
 socket.on("roomInfo", info => {
   roomInfo = info;
@@ -175,7 +175,7 @@ function drawPlayers(dt){
     const color=playerColors[(p.number-1)%playerColors.length];
     const hidden=p.invisible&&p.id!==myId;
     ctx.save();ctx.translate(r.x,r.y);ctx.rotate(r.angle);
-    ctx.globalAlpha=hidden?.16:1;
+    ctx.globalAlpha=hidden ? 0.16 : 1;
     if(p.power==="shield"){ctx.strokeStyle=powers.shield.color;ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,27,0,Math.PI*2);ctx.stroke();}
     ctx.shadowColor=color;ctx.shadowBlur=hidden?3:17;
     ctx.fillStyle="#0a120e";ctx.fillRect(-20,-16,42,32);
@@ -184,7 +184,7 @@ function drawPlayers(dt){
     ctx.fillStyle="#d6ddca";ctx.fillRect(8,-5,25,10);
     ctx.fillStyle="#fff1c2";ctx.fillRect(29,-2,8,4);
     ctx.restore();
-    ctx.globalAlpha=hidden?.22:1;
+    ctx.globalAlpha=hidden ? 0.22 : 1;
     ctx.fillStyle="rgba(0,0,0,.6)";ctx.fillRect(r.x-25,r.y-38,50,6);
     ctx.fillStyle=color;ctx.fillRect(r.x-25,r.y-38,50*Math.max(0,p.hp/100),6);
     ctx.fillStyle="#f0f2e8";ctx.font="12px monospace";ctx.textAlign="center";
@@ -227,8 +227,14 @@ function drawExplosions(){
     ctx.fillStyle=g;ctx.beginPath();ctx.arc(e.x,e.y,radius,0,Math.PI*2);ctx.fill();ctx.restore();
   }
 }
-let previousFrame=performance.now();
+let previousFrame=performance.now(), rendering=false;
+function startRender(){
+  if(rendering)return;
+  rendering=true;previousFrame=performance.now();
+  requestAnimationFrame(draw);
+}
 function draw(){
+  if(gamePanel.classList.contains("hidden")){rendering=false;return;}
   const now=performance.now(),dt=Math.min(40,now-previousFrame);previousFrame=now;
   const me=state.players.find(p=>p.id===myId);
   if(me&&me.connected){
@@ -242,6 +248,6 @@ function draw(){
   ctx.drawImage(mapCanvas,0,0);
   drawCrates();drawClones();drawExplosions();drawBullets(dt);drawPlayers(dt);
   ctx.setTransform(1,0,0,1,0,0);
-  requestAnimationFrame(draw);
+  if(state.status!=="finished") requestAnimationFrame(draw);
+  else rendering=false;
 }
-draw();
