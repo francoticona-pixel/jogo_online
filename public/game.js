@@ -20,7 +20,8 @@ const powers = {
   shield: { label: "ESCUDO", icon: "◇", color: "#69d0a4" },
   invisibility: { label: "INVISIBILIDADE", icon: "◌", color: "#a6c9ff" },
   clone: { label: "CLONAGEM", icon: "⧉", color: "#c69cff" },
-  bomb: { label: "LANÇA-BOMBA", icon: "✹", color: "#ff896c" },
+  bomb: { label: "BOMBA (3S)", icon: "✹", color: "#ff896c" },
+  flame: { label: "LANÇA-CHAMAS", icon: "♨", color: "#ff713d" },
   medkit: { label: "KIT DE VIDA", icon: "+", color: "#ff6d87" },
   life: { label: "VIDA EXTRA", icon: "♥", color: "#ff4f72" }
 };
@@ -68,7 +69,7 @@ $("joinForm").addEventListener("submit", e => {
   e.preventDefault(); $("joinError").textContent = "";
   roomCode = $("roomCode").value.trim().toUpperCase();
   selectedName=($("playerName").value.trim()||"OPERADOR").slice(0,16);
-  if (roomCode) socket.emit("joinRoom", {code:roomCode,name:selectedName,skin:selectedSkin});
+  if (roomCode) socket.emit("joinRoom", {code:roomCode,name:selectedName,skin:selectedSkin,theme:selectedTheme});
 });
 socket.on("connect_error", () => { $("joinError").textContent = "Não foi possível conectar ao servidor. Atualize a página."; });
 socket.on("joinError", msg => $("joinError").textContent = msg);
@@ -81,6 +82,7 @@ socket.on("joined", data => {
 });
 socket.on("roomInfo", info => {
   roomInfo = info;
+  if(info.theme && info.theme!==selectedTheme){selectedTheme=info.theme;$("mapSelect").value=selectedTheme;buildMap();}
   const count = info.count || 0;
   $("roomLobbyCount").textContent = count + " / " + info.maxPlayers + " OPERADORES";
   $("roomLobbyHelp").textContent = count >= info.maxPlayers ? "Sala cheia. O anfitrião já pode começar." : "Convide seus amigos usando o código " + info.code + ".";
@@ -101,6 +103,7 @@ socket.on("roomInfo", info => {
 });
 socket.on("state", s => {
   state = s;
+  if(s.theme && s.theme!==selectedTheme){selectedTheme=s.theme;$("mapSelect").value=selectedTheme;buildMap();}
   $("gameStatus").textContent = s.status === "playing" ? s.players.filter(p => p.connected).length + " OPERADORES EM COMBATE" : s.status === "finished" ? "PARTIDA ENCERRADA" : "AGUARDANDO INÍCIO";
   const me = s.players.find(p => p.id === myId);
   if (me) {
@@ -129,7 +132,7 @@ function showResults(rankings) {
     row.append(medal,name,stats); $("podiumList").appendChild(row);
   });
   const champion=rankings[0];
-  $("resultTitle").textContent=champion?.winner ? "VITÓRIA DO OPERADOR "+String(champion.number).padStart(2,"0") : champion ? "TOP 1 — OPERADOR "+String(champion.number).padStart(2,"0") : "PARTIDA ENCERRADA";
+  $("resultTitle").textContent=champion?.winner ? "VITÓRIA — "+(champion.name||"OPERADOR") : champion ? "TOP 1 — "+(champion.name||"OPERADOR") : "PARTIDA ENCERRADA";
 }
 $("returnLobby").addEventListener("click",()=>location.reload());
 document.addEventListener("fullscreenchange",()=>{document.body.classList.toggle("playing-fullscreen",!!document.fullscreenElement);});
@@ -178,6 +181,7 @@ function drawCrates(){
 function drawPlayers(dt){
   for(const p of state.players){
     if(!p.connected||p.lives<=0||p.hp<=0)continue;
+    if(p.invisible && p.id!==myId) continue;
     let r=renderedPlayers.get(p.id);
     if(!r){r={x:p.x,y:p.y,angle:p.angle};renderedPlayers.set(p.id,r);}
     const k=Math.min(.48,dt/75);
@@ -189,9 +193,11 @@ function drawPlayers(dt){
     ctx.globalAlpha=hidden ? 0.16 : 1;
     if(p.power==="shield"){ctx.strokeStyle=powers.shield.color;ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,27,0,Math.PI*2);ctx.stroke();}
     ctx.shadowColor=color;ctx.shadowBlur=hidden?3:17;
-    ctx.fillStyle="#080d12";ctx.beginPath();ctx.roundRect(-21,-17,44,34,7);ctx.fill();
-    ctx.shadowBlur=0;ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(-16,-12,31,24,5);ctx.fill();
-    ctx.fillStyle="#17232b";ctx.fillRect(-7,-8,14,16);
+    ctx.fillStyle="#080d12";ctx.beginPath();ctx.roundRect(-23,-18,47,36,8);ctx.fill();
+    ctx.shadowBlur=0;ctx.fillStyle="#29333a";ctx.fillRect(-20,-16,42,5);ctx.fillRect(-20,11,42,5);
+    ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(-16,-12,31,24,5);ctx.fill();
+    ctx.fillStyle="#17232b";ctx.beginPath();ctx.roundRect(-8,-9,18,18,5);ctx.fill();
+    ctx.fillStyle="rgba(255,255,255,.22)";ctx.fillRect(-4,-7,9,3);
     ctx.strokeStyle="rgba(255,255,255,.65)";ctx.lineWidth=2;ctx.strokeRect(-12,-9,7,18);ctx.strokeRect(2,-9,7,18);
     ctx.fillStyle="#d6e3e8";ctx.beginPath();ctx.roundRect(8,-5,27,10,3);ctx.fill();
     ctx.fillStyle="#fff1c2";ctx.fillRect(31,-2,7,4);
@@ -200,7 +206,7 @@ function drawPlayers(dt){
     ctx.globalAlpha=hidden ? 0.22 : 1;
     ctx.fillStyle="rgba(0,0,0,.6)";ctx.fillRect(r.x-25,r.y-38,50,6);
     ctx.fillStyle=color;ctx.fillRect(r.x-25,r.y-38,50*Math.max(0,p.hp/100),6);
-    ctx.fillStyle="#f0f2e8";ctx.font="12px monospace";ctx.textAlign="center";
+    ctx.fillStyle="#f0f2e8";ctx.font="bold 12px monospace";ctx.textAlign="center";
     ctx.fillText((p.name||("OP "+String(p.number).padStart(2,"0")))+(p.id===myId?" • VOCÊ":""),r.x,r.y-48);
     ctx.fillStyle="#e46d5c";ctx.font="bold 11px monospace";ctx.fillText("♥ "+p.lives,r.x,r.y+39);
     ctx.globalAlpha=1;
@@ -215,11 +221,13 @@ function drawBullets(dt){
     const k=Math.min(.72,dt/55);
     r.x+=(b.x-r.x)*k;r.y+=(b.y-r.y)*k;
     ctx.save();ctx.translate(r.x,r.y);ctx.rotate(Math.atan2(b.vy,b.vx));
-    const bomb=b.type==="bomb";
-    ctx.shadowColor=bomb?"#ff765c":"#ffe49a";ctx.shadowBlur=bomb?22:15;
-    ctx.strokeStyle=bomb?"#ff8c68":"#fff4c7";ctx.lineWidth=bomb?8:4;
+    const bomb=b.type==="bomb", flame=b.type==="flame";
+    ctx.shadowColor=bomb?"#ff765c":flame?"#ff5a24":"#ffe49a";ctx.shadowBlur=bomb?22:flame?20:15;
+    ctx.strokeStyle=bomb?"#ff8c68":flame?"#ff6b32":"#fff4c7";ctx.lineWidth=bomb?8:flame?10:4;
     ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(7,0);ctx.stroke();
-    ctx.fillStyle=bomb?"#ff5d43":"#f2c96b";ctx.beginPath();ctx.arc(0,0,bomb?7:4,0,Math.PI*2);ctx.fill();ctx.restore();
+    ctx.fillStyle=bomb?"#ff5d43":flame?"#ffd15a":"#f2c96b";ctx.beginPath();ctx.arc(0,0,bomb?7:flame?8:4,0,Math.PI*2);ctx.fill();
+    if(bomb && b.fuseLeft>0){ctx.rotate(-Math.atan2(b.vy,b.vx));ctx.fillStyle="#fff";ctx.font="bold 11px monospace";ctx.textAlign="center";ctx.fillText((b.fuseLeft/1000).toFixed(1)+"s",0,-15);}
+    ctx.restore();
   }
   for(const id of renderedBullets.keys()) if(!active.has(id)) renderedBullets.delete(id);
 }
@@ -259,6 +267,7 @@ function draw(){
   ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle="#101a17";ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.setTransform(ZOOM,0,0,ZOOM,canvas.width/2-camera.x*ZOOM,canvas.height/2-camera.y*ZOOM);
   ctx.drawImage(mapCanvas,0,0);
+  if(state.gas && state.gas.remaining>0){ctx.save();ctx.fillStyle="rgba(144,205,83,.23)";ctx.beginPath();ctx.rect(0,0,ARENA.w,ARENA.h);ctx.arc(state.gas.x,state.gas.y,state.gas.radius,0,Math.PI*2,true);ctx.fill("evenodd");ctx.strokeStyle="rgba(188,235,110,.9)";ctx.lineWidth=8;ctx.beginPath();ctx.arc(state.gas.x,state.gas.y,state.gas.radius,0,Math.PI*2);ctx.stroke();ctx.restore();}
   drawCrates();drawClones();drawExplosions();drawBullets(dt);drawPlayers(dt);
   ctx.setTransform(1,0,0,1,0,0);
   if(state.status!=="finished") requestAnimationFrame(draw);
