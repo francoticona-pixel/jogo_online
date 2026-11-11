@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>DUEL ARENA | Tactical Combat</title>
-  <link rel="stylesheet" href="style.css?v=duel-6">
+  <link rel="stylesheet" href="style.css?v=duel-7">
 </head>
 <body>
   <main class="shell">
@@ -83,6 +83,7 @@
       <div class="arena-wrap">
         <canvas id="arena" width="1000" height="620"></canvas>
         <button id="fullscreenBtn" class="fullscreen-btn" type="button" title="Tela cheia">⛶ TELA CHEIA</button>
+        <div id="winnerBanner" class="winner-banner hidden" role="status" aria-live="assertive"></div>
         <div id="waiting" class="waiting"><strong>AGUARDANDO INÍCIO DA PARTIDA</strong><span>O anfitrião começará quando todos estiverem prontos.</span></div>
       </div>
       <div class="bottom-hud">
@@ -104,7 +105,7 @@
     <footer><span>DUEL ARENA // MULTIPLAYER 0.3</span><span>JOGUE COM RESPEITO. LUTE PELA VITÓRIA.</span></footer>
   </main>
   <script src="/socket.io/socket.io.js"></script>
-  <script src="game.js?v=duel-6"></script>
+  <script src="game.js?v=duel-7"></script>
   <script src="adventure.js?v=duel-1"></script>
 </body>
 </html>
