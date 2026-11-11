@@ -99,6 +99,7 @@ function roomState(room) {
       remaining: Math.max(0, e.expiresAt - now)
     })),
     rankings: room.rankings,
+    theme: room.theme || "forest",
     gas: room.gas ? { x: room.gas.x, y: room.gas.y, radius: room.gas.radius, remaining: Math.max(0, room.gas.endsAt - now) } : null
   };
 }
@@ -114,6 +115,7 @@ function broadcastRoomInfo(room) {
     hostId: room.hostId,
     status: room.finished ? "finished" : room.started ? "playing" : "waiting",
     started: room.started,
+    theme: room.theme || "forest",
     count: connected.length,
     maxPlayers: MAX_PLAYERS,
     players: connected.map(p => ({ id: p.id, number: p.number, name: p.name, skin: p.skin }))
@@ -319,6 +321,7 @@ io.on("connection", socket => {
     if (!room) {
       room = {
         code,
+        theme: ["forest","neon","desert","ice"].includes(payload.theme) ? payload.theme : "forest",
         hostId: socket.id,
         players: new Map(),
         bullets: [],
