@@ -30,7 +30,13 @@ const WALLS = [
   { x: 350, y: 650, w: 90, h: 250 }, { x: 1560, y: 430, w: 90, h: 250 },
   { x: 720, y: 390, w: 150, h: 55 }, { x: 1130, y: 855, w: 150, h: 55 },
   { x: 850, y: 620, w: 100, h: 70 }, { x: 1050, y: 620, w: 100, h: 70 },
-  { x: 560, y: 850, w: 80, h: 80 }, { x: 1360, y: 370, w: 80, h: 80 }
+  { x: 560, y: 850, w: 80, h: 80 }, { x: 1360, y: 370, w: 80, h: 80 },
+  { x: 90, y: 470, w: 125, h: 65 }, { x: 1780, y: 760, w: 125, h: 65 },
+  { x: 610, y: 220, w: 75, h: 145 }, { x: 1315, y: 930, w: 75, h: 145 },
+  { x: 430, y: 410, w: 85, h: 85 }, { x: 1485, y: 805, w: 85, h: 85 },
+  { x: 760, y: 590, w: 95, h: 95 }, { x: 1145, y: 590, w: 95, h: 95 },
+  { x: 1010, y: 430, w: 65, h: 115 }, { x: 925, y: 755, w: 65, h: 115 },
+  { x: 250, y: 760, w: 95, h: 60 }, { x: 1655, y: 505, w: 95, h: 60 }
 ];
 
 const SPAWNS = [
@@ -163,7 +169,7 @@ function randomFreePoint(room, ignorePlayerId = null) {
 function spawnCrate(room) {
   if (room.crates.length >= 3) return;
   const spot = randomFreePoint(room);
-  const types = ["rapid", "speed", "triple", "shield", "invisibility", "clone", "bomb", "flame", "medkit"];
+  const types = ["rapid","speed","triple","shield","invisibility","clone","bomb","flame","rocket","armor","rapid","speed","triple","shield","clone","bomb","flame","medkit"];
   room.crateCounter++;
   room.crates.push({
     id: room.crateCounter,
@@ -201,10 +207,10 @@ function createProjectile(room, player, angle, type = "normal") {
     owner: player.id,
     x: player.x + Math.cos(angle) * (bomb ? 30 : 23),
     y: player.y + Math.sin(angle) * (bomb ? 30 : 23),
-    vx: Math.cos(angle) * (bomb ? 7.2 : type === "flame" ? 8.5 : 12),
-    vy: Math.sin(angle) * (bomb ? 7.2 : type === "flame" ? 8.5 : 12),
-    life: bomb ? 105 : type === "flame" ? 14 : 75,
-    damage: bomb ? 48 : type === "flame" ? 4 : 20,
+    vx: Math.cos(angle) * (bomb ? 7.2 : type === "flame" ? 10.5 : type === "rocket" ? 9.5 : 12),
+    vy: Math.sin(angle) * (bomb ? 7.2 : type === "flame" ? 10.5 : type === "rocket" ? 9.5 : 12),
+    life: bomb ? 105 : type === "flame" ? 26 : type === "rocket" ? 95 : 75,
+    damage: bomb ? 68 : type === "flame" ? 7 : type === "rocket" ? 38 : 20,
     type,
     fuseAt: 0
   });
@@ -215,8 +221,10 @@ function createProjectile(room, player, angle, type = "normal") {
 function damagePlayer(room, target, amount, killerId, now) {
   if (!target.connected || target.lives <= 0 || target.hp <= 0 || target.invulnerableUntil > now) return false;
   const damage = target.power === "shield" && target.powerUntil > now
-    ? Math.ceil(amount * 0.5)
-    : amount;
+    ? 0
+    : target.power === "armor" && target.powerUntil > now
+      ? Math.ceil(amount * 0.68)
+      : amount;
   target.hp = Math.max(0, target.hp - damage);
   if (target.hp > 0) return false;
 
@@ -237,7 +245,7 @@ function damagePlayer(room, target, amount, killerId, now) {
   return true;
 }
 function explodeBomb(room, bomb, now) {
-  const radius = 132;
+  const radius = 168;
   room.explosions.push({
     x: bomb.x,
     y: bomb.y,
@@ -335,7 +343,7 @@ io.on("connection", socket => {
     if (!room) {
       room = {
         code,
-        theme: ["forest","neon","desert","ice"].includes(payload.theme) ? payload.theme : "forest",
+        theme: ["forest","neon","desert","ice","tundra","volcano","jungle","city"].includes(payload.theme) ? payload.theme : "forest",
         hostId: socket.id,
         players: new Map(),
         bullets: [],
@@ -479,8 +487,9 @@ setInterval(() => {
       let fireDelay = 275;
       if (p.power === "rapid") fireDelay = 125;
       else if (p.power === "triple") fireDelay = 330;
-      else if (p.power === "bomb") fireDelay = 1100;
-      else if (p.power === "flame") fireDelay = 70;
+      else if (p.power === "bomb") fireDelay = 850;
+      else if (p.power === "rocket") fireDelay = 720;
+      else if (p.power === "flame") fireDelay = 90;
       if (p.input.shoot && now >= p.nextShot) {
         p.nextShot = now + fireDelay;
         if (p.power === "triple") {
@@ -488,7 +497,7 @@ setInterval(() => {
           createProjectile(room, p, p.angle);
           createProjectile(room, p, p.angle + 0.2);
         } else {
-          createProjectile(room, p, p.angle, p.power === "bomb" ? "bomb" : p.power === "flame" ? "flame" : "normal");
+          createProjectile(room, p, p.angle, p.power === "bomb" ? "bomb" : p.power === "flame" ? "flame" : p.power === "rocket" ? "rocket" : "normal");
         }
       }
 
@@ -499,6 +508,8 @@ setInterval(() => {
         p.powerUntil = now + POWER_DURATION;
         if (crate.type === "invisibility") p.invisibleUntil = now + 7800;
         if (crate.type === "shield") { p.powerUntil = now + 6000; p.invulnerableUntil = now + 6000; }
+        if (crate.type === "armor") p.powerUntil = now + 12000;
+        if (crate.type === "rocket") p.powerUntil = now + 9000;
         if (crate.type === "medkit") { p.hp = Math.min(100, p.hp + 55); p.powerUntil = now + 2500; }
         if (crate.type === "life") { p.lives = Math.min(5, p.lives + 1); p.powerUntil = now + 2500; }
         if (crate.type === "clone") {
@@ -530,11 +541,32 @@ setInterval(() => {
         continue;
       }
 
+      if (bullet.type === "rocket") {
+        let impact = hitsWall(bullet.x, bullet.y, 8) || bullet.x < 12 || bullet.x > ARENA.w - 12 || bullet.y < 12 || bullet.y > ARENA.h - 12;
+        if (!impact) {
+          for (const target of players) {
+            if (target.id === bullet.owner || !target.connected || target.lives <= 0 || target.hp <= 0) continue;
+            if (Math.hypot(target.x - bullet.x, target.y - bullet.y) < PLAYER_RADIUS + 12) { impact = true; break; }
+          }
+        }
+        if (impact || bullet.life <= 0) {
+          const radius = 92;
+          room.explosions.push({ x: bullet.x, y: bullet.y, radius, expiresAt: now + 460 });
+          for (const target of players) {
+            if (target.id === bullet.owner || !target.connected || target.lives <= 0 || target.hp <= 0) continue;
+            const distance = Math.hypot(target.x - bullet.x, target.y - bullet.y);
+            if (distance <= radius) damagePlayer(room, target, Math.round(bullet.damage * Math.max(.35, 1-distance/(radius*1.5))), bullet.owner, now);
+          }
+          bullet.life = 0;
+        }
+        continue;
+      }
+
       if (bullet.type === "flame") {
         let flameHit = false;
         for (const target of players) {
           if (target.id === bullet.owner || !target.connected || target.lives <= 0 || target.hp <= 0) continue;
-          if (Math.hypot(target.x - bullet.x, target.y - bullet.y) < PLAYER_RADIUS + 10) { damagePlayer(room,target,bullet.damage,bullet.owner,now); flameHit=true; break; }
+          if (Math.hypot(target.x - bullet.x, target.y - bullet.y) < PLAYER_RADIUS + 24) { damagePlayer(room,target,bullet.damage,bullet.owner,now); flameHit=true; break; }
         }
         if (flameHit || bullet.life <= 0 || hitsWall(bullet.x,bullet.y,5)) bullet.life=0;
         continue;
