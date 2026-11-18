@@ -314,6 +314,52 @@ function buildMap() {
       mapCtx.fillStyle=c;mapCtx.beginPath();mapCtx.arc(x-25,y,4,0,Math.PI*2);mapCtx.fill();
     }
   }
+  // Cenografia de maior escala: marcos visuais exclusivos para cada mapa.
+  // Tudo é desenhado no canvas local e fica fora das áreas de colisão.
+  const landmark=(x,y,fn,pad=125)=>{if(clearSpot(x,y,pad)){mapCtx.save();fn(x,y);mapCtx.restore();}};
+  const glow=(x,y,r,inner,outer)=>{const g=mapCtx.createRadialGradient(x,y,2,x,y,r);g.addColorStop(0,inner);g.addColorStop(1,outer);mapCtx.fillStyle=g;mapCtx.beginPath();mapCtx.arc(x,y,r,0,Math.PI*2);mapCtx.fill();};
+  if(selectedTheme==="forest"||selectedTheme==="jungle"){
+    // Troncos caídos, cogumelos e copas em camadas para dar profundidade à mata.
+    for(let i=0;i<15;i++){const x=90+scenicRand()*1820,y=90+scenicRand()*1120;if(!clearSpot(x,y,65))continue;
+      mapCtx.save();mapCtx.translate(x,y);mapCtx.rotate(scenicRand()*Math.PI);
+      mapCtx.fillStyle="rgba(28,48,29,.35)";mapCtx.beginPath();mapCtx.ellipse(0,8,38,12,0,0,Math.PI*2);mapCtx.fill();
+      mapCtx.strokeStyle="#694a32";mapCtx.lineWidth=13;mapCtx.lineCap="round";mapCtx.beginPath();mapCtx.moveTo(-29,0);mapCtx.lineTo(28,-5);mapCtx.stroke();
+      mapCtx.strokeStyle="#b98b57";mapCtx.lineWidth=4;mapCtx.beginPath();mapCtx.moveTo(-18,-5);mapCtx.lineTo(18,-10);mapCtx.stroke();
+      mapCtx.restore();
+    }
+    for(let i=0;i<26;i++){const x=80+scenicRand()*1840,y=80+scenicRand()*1140;if(!clearSpot(x,y,35))continue;
+      ellipse(x,y+5,8,4,"rgba(30,45,26,.3)");mapCtx.fillStyle=i%2?"#e87886":"#f4c66b";mapCtx.beginPath();mapCtx.arc(x,y,6,Math.PI,Math.PI*2);mapCtx.fill();mapCtx.fillStyle="#f5e8c8";mapCtx.fillRect(x-1,y,2,6);
+    }
+    if(selectedTheme==="jungle")for(let i=0;i<12;i++){const x=100+scenicRand()*1800,y=90+scenicRand()*1080;if(!clearSpot(x,y,80))continue;mapCtx.strokeStyle="rgba(196,171,77,.8)";mapCtx.lineWidth=5;mapCtx.beginPath();mapCtx.moveTo(x-30,y-65);mapCtx.bezierCurveTo(x+40,y-25,x-35,y+20,x+15,y+70);mapCtx.stroke();}
+  }else if(selectedTheme==="ice"||selectedTheme==="tundra"){
+    // Estações polares, iglus e placas de gelo com reflexos.
+    landmark(340,250,(x,y)=>{ellipse(x,y+35,78,22,"rgba(30,91,132,.24)");mapCtx.fillStyle="#b8e9f7";mapCtx.beginPath();mapCtx.arc(x,y,62,Math.PI,0);mapCtx.lineTo(x+62,y);mapCtx.closePath();mapCtx.fill();mapCtx.strokeStyle="#effdff";mapCtx.lineWidth=5;mapCtx.stroke();mapCtx.strokeStyle="#76c5df";mapCtx.lineWidth=3;for(let k=-2;k<=2;k++){mapCtx.beginPath();mapCtx.moveTo(x+k*18,y-5);mapCtx.lineTo(x+k*18,y+25);mapCtx.stroke();}});
+    landmark(1660,980,(x,y)=>{ellipse(x,y+25,88,24,"rgba(28,91,126,.25)");for(let k=0;k<3;k++)penguin(x+(k-1)*37,y+8,k===1?1.25:.9);});
+    for(let i=0;i<16;i++){const x=80+scenicRand()*1840,y=80+scenicRand()*1140;if(!clearSpot(x,y,55))continue;glow(x,y,42,"rgba(166,239,255,.18)","rgba(166,239,255,0)");}
+  }else if(selectedTheme==="desert"){
+    // Arcos de templo, pilares antigos e pequenos ossos fossilizados.
+    landmark(370,930,(x,y)=>{mapCtx.fillStyle="#9b613e";mapCtx.fillRect(x-58,y-52,18,105);mapCtx.fillRect(x+40,y-52,18,105);mapCtx.fillRect(x-68,y-67,136,18);mapCtx.fillStyle="#e5b978";mapCtx.fillRect(x-48,y-47,8,93);mapCtx.fillRect(x+49,y-47,8,93);});
+    landmark(1600,260,(x,y)=>{mapCtx.fillStyle="#b87845";mapCtx.beginPath();mapCtx.moveTo(x-85,y+45);mapCtx.lineTo(x,y-65);mapCtx.lineTo(x+85,y+45);mapCtx.closePath();mapCtx.fill();mapCtx.fillStyle="#f0c887";mapCtx.beginPath();mapCtx.moveTo(x-85,y+45);mapCtx.lineTo(x,y-65);mapCtx.lineTo(x-18,y+45);mapCtx.closePath();mapCtx.fill();mapCtx.fillStyle="#71452f";mapCtx.fillRect(x-12,y+15,24,30);});
+    for(let i=0;i<18;i++){const x=80+scenicRand()*1840,y=80+scenicRand()*1140;if(!clearSpot(x,y,35))continue;mapCtx.strokeStyle="rgba(247,221,164,.55)";mapCtx.lineWidth=3;mapCtx.beginPath();mapCtx.arc(x,y,8+scenicRand()*13,.2,Math.PI*1.7);mapCtx.stroke();}
+  }else if(selectedTheme==="volcano"){
+    // Crateres de lava com borda de basalto e brilho quente.
+    for(const [x,y,r] of [[430,900,72],[1450,450,88],[1770,1080,58]])landmark(x,y,(px,py)=>{glow(px,py,r*1.8,"rgba(255,84,30,.30)","rgba(255,40,15,0)");ellipse(px,py+7,r,r*.55,"#211d28");ellipse(px,py,r*.78,r*.39,"#9e3428");ellipse(px,py-2,r*.58,r*.25,"#ff7835");ellipse(px-12,py-7,r*.25,r*.08,"#ffd875");},r+35);
+    for(let i=0;i<24;i++){const x=80+scenicRand()*1840,y=80+scenicRand()*1140;if(!clearSpot(x,y,40))continue;mapCtx.fillStyle="#51404a";mapCtx.beginPath();mapCtx.moveTo(x-12,y+9);mapCtx.lineTo(x-5,y-10);mapCtx.lineTo(x+9,y-14);mapCtx.lineTo(x+16,y+7);mapCtx.closePath();mapCtx.fill();mapCtx.strokeStyle="rgba(255,113,56,.5)";mapCtx.lineWidth=2;mapCtx.stroke();}
+  }else if(selectedTheme==="city"){
+    // Ilhas urbanas: fachadas, janelas acesas, postes e pequenos jardins.
+    for(let i=0;i<12;i++){const x=100+scenicRand()*1800,y=100+scenicRand()*1100;if(!clearSpot(x,y,100))continue;
+      const w=42+scenicRand()*28,h=35+scenicRand()*35;mapCtx.fillStyle="rgba(20,34,49,.35)";mapCtx.fillRect(x-w/2+7,y-h/2+9,w,h);
+      rounded(x-w/2,y-h/2,w,h,4,"#71899a","#c3d4dc");
+      for(let wx=x-w/2+8;wx<x+w/2-5;wx+=14)for(let wy=y-h/2+8;wy<y+h/2-5;wy+=14){mapCtx.fillStyle=(wx+wy)%3?"#f6d78a":"#8ed9e6";mapCtx.fillRect(wx,wy,7,8);}
+      mapCtx.fillStyle="#3b4d5c";mapCtx.fillRect(x-3,y-h/2-8,6,8);
+    }
+    for(const [x,y] of [[450,300],[1530,1000],[1120,300],[720,1050]])landmark(x,y,(px,py)=>{mapCtx.strokeStyle="#d8e5e9";mapCtx.lineWidth=4;mapCtx.beginPath();mapCtx.moveTo(px,py+28);mapCtx.lineTo(px,py-42);mapCtx.stroke();glow(px,py-42,20,"rgba(255,229,151,.55)","rgba(255,229,151,0)");ellipse(px,py-42,6,6,"#ffe7a0");},45);
+  }else{
+    // Torres holográficas, plataformas de energia e anéis de luz.
+    for(const [x,y,c] of [[360,340,"#ff68d9"],[1630,360,"#42eaff"],[420,1000,"#42eaff"],[1580,1000,"#ff68d9"]])landmark(x,y,(px,py)=>{glow(px,py,105,c==="#42eaff"?"rgba(66,234,255,.17)":"rgba(255,104,217,.17)","rgba(0,0,0,0)");mapCtx.fillStyle="#171b3d";mapCtx.beginPath();mapCtx.moveTo(px-38,py+40);mapCtx.lineTo(px-22,py-45);mapCtx.lineTo(px+22,py-45);mapCtx.lineTo(px+38,py+40);mapCtx.closePath();mapCtx.fill();mapCtx.strokeStyle=c;mapCtx.lineWidth=4;mapCtx.shadowColor=c;mapCtx.shadowBlur=18;mapCtx.stroke();mapCtx.shadowBlur=0;for(let k=0;k<3;k++){mapCtx.strokeStyle=c;mapCtx.globalAlpha=.8-k*.2;mapCtx.strokeRect(px-25-k*5,py-25-k*5,50+k*10,50+k*10);}},125);
+    for(let i=0;i<32;i++){const x=80+scenicRand()*1840,y=80+scenicRand()*1140;if(!clearSpot(x,y,35))continue;glow(x,y,28,"rgba(66,234,255,.22)","rgba(66,234,255,0)");}
+  }
+
   // Moldura interna fina e cantos destacados dão profundidade sem cobrir a arena.
   mapCtx.strokeStyle="rgba(255,255,255,.20)";mapCtx.lineWidth=2;mapCtx.strokeRect(30,30,ARENA.w-60,ARENA.h-60);
   for(const [x,y,sx,sy] of [[38,38,1,1],[1962,38,-1,1],[38,1262,1,-1],[1962,1262,-1,-1]]){
