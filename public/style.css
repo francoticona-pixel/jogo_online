@@ -64,3 +64,22 @@ body.playing-fullscreen{overflow:hidden}
 /* Aviso de vitória sincronizado para todos os participantes */
 .winner-banner{position:absolute;z-index:7;left:50%;top:50%;transform:translate(-50%,-50%);width:min(90%,680px);padding:24px 18px;text-align:center;background:rgba(8,15,10,.94);border:2px solid var(--lime);box-shadow:0 0 35px #c5e36b55;color:var(--lime);font:900 clamp(30px,6vw,64px) 'Barlow Condensed';letter-spacing:2px;text-shadow:0 0 18px #c5e36b66;pointer-events:none}
 .winner-banner.hidden{display:none!important}
+
+
+/* Acabamento premium: interface e molduras do campo de batalha */
+:root{--lime:#d2ed79;--panel:#17212a;--line:#3c5260}
+body{background:radial-gradient(ellipse at 50% -18%,#304b54 0,#101820 48%,#080e14 100%)}
+.panel,.game-panel,.adventure-panel{background:linear-gradient(145deg,#1c2b35 0%,#121c25 58%,#17242b 100%);border-color:#405968;box-shadow:0 18px 55px rgba(0,0,0,.28)}
+.brand-mark{border-color:#d2ed79;color:#d2ed79;box-shadow:0 0 20px rgba(210,237,121,.12)}
+.arena-wrap,.adventure-arena-wrap{border:2px solid #6b8993;box-shadow:0 0 0 5px rgba(125,174,183,.07),0 18px 45px rgba(0,0,0,.3)}
+#arena,#adventureCanvas{background:#15232a}
+.customize-row select{background:linear-gradient(180deg,#1b2b35,#0e171f);border-color:#5b7784;color:#f1f7f6;box-shadow:inset 0 1px rgba(255,255,255,.08)}
+.customize-row select:focus{outline:2px solid #9ed8db;outline-offset:1px}
+#tankPreview,#mapPreview{border:1px solid #688994;border-radius:7px;box-shadow:0 8px 20px rgba(0,0,0,.24)}
+button{background:linear-gradient(135deg,#d8f18b,#a8d65d);box-shadow:0 5px 18px rgba(168,214,93,.13)}
+button.adventure-entry{border-color:#9bd8d9;color:#b7eeee}
+.health>div{background:#263943;border-color:#71858a}
+.health i{background:linear-gradient(90deg,#d2ed79,#78d69a)}
+.lives-count,.room-lobby,.adventure-hud>div{background:linear-gradient(145deg,#20333c,#15232c);border-color:#4c6974}
+.match-result{border-color:#b5df85;box-shadow:0 0 45px rgba(166,224,130,.15)}
+@media(min-width:900px){.shell:has(.game-panel:not(.hidden)){max-width:1680px}}
