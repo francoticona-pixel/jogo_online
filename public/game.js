@@ -27,8 +27,10 @@ const powers = {
   clone: { label: "CLONAGEM", icon: "⧉", color: "#c69cff" },
   bomb: { label: "BOMBA (3S)", icon: "✹", color: "#ff896c" },
   flame: { label: "LANÇA-CHAMAS", icon: "♨", color: "#ff713d" },
-  medkit: { label: "KIT DE VIDA", icon: "+", color: "#ff6d87" },
-  life: { label: "VIDA EXTRA", icon: "♥", color: "#ff4f72" }
+  medkit: { label: "KIT DE CURA", icon: "+", color: "#ff6d87" },
+  life: { label: "VIDA EXTRA", icon: "♥", color: "#ff4f72" },
+  rocket: { label: "MÍSSIL EXPLOSIVO", icon: "➤", color: "#ff9a52" },
+  armor: { label: "BLINDAGEM", icon: "⬟", color: "#8bc7d9" }
 };
 const playerColors = ["#c5e36b", "#e46d5c", "#62c3dc", "#d7a6f5", "#f0bb62", "#69d0a4", "#f07caa", "#98a8ff", "#d6dfed", "#d2db70"];
 const walls = [
@@ -40,20 +42,58 @@ const walls = [
   { x: 350, y: 650, w: 90, h: 250 }, { x: 1560, y: 430, w: 90, h: 250 },
   { x: 720, y: 390, w: 150, h: 55 }, { x: 1130, y: 855, w: 150, h: 55 },
   { x: 850, y: 620, w: 100, h: 70 }, { x: 1050, y: 620, w: 100, h: 70 },
-  { x: 560, y: 850, w: 80, h: 80 }, { x: 1360, y: 370, w: 80, h: 80 }
+  { x: 560, y: 850, w: 80, h: 80 }, { x: 1360, y: 370, w: 80, h: 80 },
+  { x: 90, y: 470, w: 125, h: 65 }, { x: 1780, y: 760, w: 125, h: 65 },
+  { x: 610, y: 220, w: 75, h: 145 }, { x: 1315, y: 930, w: 75, h: 145 },
+  { x: 430, y: 410, w: 85, h: 85 }, { x: 1485, y: 805, w: 85, h: 85 },
+  { x: 760, y: 590, w: 95, h: 95 }, { x: 1145, y: 590, w: 95, h: 95 },
+  { x: 1010, y: 430, w: 65, h: 115 }, { x: 925, y: 755, w: 65, h: 115 },
+  { x: 250, y: 760, w: 95, h: 60 }, { x: 1655, y: 505, w: 95, h: 60 }
 ];
 const mapCanvas = document.createElement("canvas");
 mapCanvas.width = ARENA.w;
 mapCanvas.height = ARENA.h;
 const mapCtx = mapCanvas.getContext("2d");
 function buildMap() {
-  const palettes={forest:["#25382d","#101a17","#8c987e","#566b59","#293d32"],neon:["#211c3c","#080d20","#a76bff","#43336e","#17142b"],desert:["#57452d","#20170f","#d4ad6b","#997447","#4d3822"],ice:["#244457","#0d1c2a","#b6e7f4","#6897ae","#294b60"]};
+  const palettes={
+    forest:["#25382d","#101a17","#8c987e","#566b59","#293d32"],
+    neon:["#211c3c","#080d20","#a76bff","#43336e","#17142b"],
+    desert:["#57452d","#20170f","#d4ad6b","#997447","#4d3822"],
+    ice:["#244457","#0d1c2a","#b6e7f4","#6897ae","#294b60"],
+    tundra:["#dcebf0","#9ab9c8","#f4fdff","#7299aa","#35596d"],
+    volcano:["#43251f","#170f12","#ff8952","#873c2e","#281a20"],
+    jungle:["#1d422c","#0a2119","#83b95b","#386a3e","#183425"],
+    city:["#343b48","#151a24","#a6b4c8","#596477","#252c39"]
+  };
   const palette=palettes[selectedTheme]||palettes.forest;
   const g = mapCtx.createLinearGradient(0, 0, ARENA.w, ARENA.h);
   g.addColorStop(0, palette[0]); g.addColorStop(1, palette[1]);
   mapCtx.fillStyle = g; mapCtx.fillRect(0, 0, ARENA.w, ARENA.h);
   mapCtx.fillStyle = "rgba(255,255,255,.035)";
   mapCtx.fillRect(95,95,ARENA.w-190,ARENA.h-190);
+  // Cada bioma recebe elementos próprios; são apenas cenografia, sem colisão.
+  mapCtx.save();
+  if(selectedTheme==="tundra" || selectedTheme==="ice"){
+    for(let i=0;i<95;i++){const x=(i*173)%ARENA.w,y=(i*281)%ARENA.h;mapCtx.fillStyle=i%2?"rgba(255,255,255,.18)":"rgba(105,174,205,.13)";mapCtx.beginPath();mapCtx.ellipse(x,y,24+(i%5)*8,9+(i%4)*4,(i%7)*.2,0,Math.PI*2);mapCtx.fill();}
+    // Pinguins decorativos numa faixa externa à área principal de combate.
+    for(const [px,py] of [[1900,1130],[1845,1190],[1940,1215]]){mapCtx.fillStyle="#f4fbff";mapCtx.beginPath();mapCtx.ellipse(px,py,13,19,0,0,Math.PI*2);mapCtx.fill();mapCtx.fillStyle="#182b39";mapCtx.beginPath();mapCtx.ellipse(px,py-2,8,13,0,0,Math.PI*2);mapCtx.fill();mapCtx.fillStyle="#f5b64d";mapCtx.beginPath();mapCtx.moveTo(px+8,py-4);mapCtx.lineTo(px+17,py);mapCtx.lineTo(px+8,py+3);mapCtx.fill();mapCtx.fillStyle="#f5b64d";mapCtx.fillRect(px-8,py+15,7,4);mapCtx.fillRect(px+2,py+15,7,4);}
+    mapCtx.fillStyle="#eafaff";mapCtx.font="bold 13px monospace";mapCtx.fillText("RESERVA DE PINGUINS • ÁREA VISUAL",1690,1270);
+  }else if(selectedTheme==="volcano"){
+    for(let i=0;i<12;i++){const x=120+(i*157)%1750,y=120+(i*239)%1050;mapCtx.strokeStyle="rgba(255,95,45,.55)";mapCtx.lineWidth=5;mapCtx.beginPath();mapCtx.moveTo(x,y);mapCtx.lineTo(x+24,y+35);mapCtx.lineTo(x+12,y+62);mapCtx.stroke();}
+    for(const [x,y,r] of [[350,370,68],[1600,950,82],[1030,180,52]]){const g=mapCtx.createRadialGradient(x,y,5,x,y,r);g.addColorStop(0,"#ffd16b");g.addColorStop(.5,"#e34e2e");g.addColorStop(1,"rgba(120,25,20,0)");mapCtx.fillStyle=g;mapCtx.beginPath();mapCtx.arc(x,y,r,0,Math.PI*2);mapCtx.fill();}
+  }else if(selectedTheme==="jungle" || selectedTheme==="forest"){
+    for(let i=0;i<46;i++){const x=100+(i*311)%1800,y=100+(i*197)%1100;if(walls.some(w=>x>w.x-45&&x<w.x+w.w+45&&y>w.y-45&&y<w.y+w.h+45))continue;mapCtx.fillStyle=i%2?"rgba(10,45,24,.5)":"rgba(130,180,75,.22)";mapCtx.beginPath();mapCtx.arc(x,y,22+(i%4)*7,0,Math.PI*2);mapCtx.fill();mapCtx.strokeStyle="rgba(190,220,130,.16)";mapCtx.lineWidth=4;mapCtx.stroke();}
+    if(selectedTheme==="jungle"){mapCtx.strokeStyle="rgba(164,205,100,.32)";mapCtx.lineWidth=8;for(let i=0;i<14;i++){const x=(i*149)%ARENA.w;mapCtx.beginPath();mapCtx.moveTo(x,0);mapCtx.quadraticCurveTo(x+65,300,x-30,560);mapCtx.stroke();}}
+  }else if(selectedTheme==="city"){
+    mapCtx.strokeStyle="rgba(190,210,235,.25)";mapCtx.lineWidth=34;mapCtx.setLineDash([55,28]);mapCtx.beginPath();mapCtx.moveTo(0,650);mapCtx.lineTo(ARENA.w,650);mapCtx.moveTo(1000,0);mapCtx.lineTo(1000,ARENA.h);mapCtx.stroke();mapCtx.setLineDash([]);
+    for(const [x,y] of [[150,150],[1650,150],[150,1000],[1660,1000],[760,180],[1260,1050]]){mapCtx.fillStyle="rgba(180,200,225,.16)";mapCtx.fillRect(x,y,120,78);mapCtx.strokeStyle="rgba(220,235,255,.28)";mapCtx.lineWidth=3;mapCtx.strokeRect(x,y,120,78);for(let wx=x+14;wx<x+110;wx+=26)for(let wy=y+12;wy<y+70;wy+=22){mapCtx.fillStyle="#a9c8dc";mapCtx.fillRect(wx,wy,9,8);}}
+  }else if(selectedTheme==="desert"){
+    for(let i=0;i<25;i++){const x=(i*227)%ARENA.w,y=(i*163)%ARENA.h;mapCtx.strokeStyle="rgba(255,220,155,.22)";mapCtx.lineWidth=5;mapCtx.beginPath();mapCtx.ellipse(x,y,90+(i%4)*18,22,0,Math.PI,Math.PI*2);mapCtx.stroke();}
+    for(let i=0;i<18;i++){const x=(i*313)%ARENA.w,y=(i*181)%ARENA.h;mapCtx.fillStyle="#423321";mapCtx.beginPath();mapCtx.ellipse(x,y,13,9,.4,0,Math.PI*2);mapCtx.fill();}
+  }else{
+    for(let i=0;i<32;i++){const x=(i*197)%ARENA.w,y=(i*283)%ARENA.h;mapCtx.strokeStyle="rgba(190,145,255,.17)";mapCtx.lineWidth=3;mapCtx.beginPath();mapCtx.arc(x,y,20+(i%5)*10,0,Math.PI*2);mapCtx.stroke();}
+  }
+  mapCtx.restore();
   mapCtx.strokeStyle = "rgba(161,190,160,.075)"; mapCtx.lineWidth = 1;
   for (let x = 0; x <= ARENA.w; x += 50) { mapCtx.beginPath(); mapCtx.moveTo(x,0); mapCtx.lineTo(x,ARENA.h); mapCtx.stroke(); }
   for (let y = 0; y <= ARENA.h; y += 50) { mapCtx.beginPath(); mapCtx.moveTo(0,y); mapCtx.lineTo(ARENA.w,y); mapCtx.stroke(); }
@@ -92,7 +132,7 @@ function drawMapPreview(){
   pctx.drawImage(mapCanvas,0,0,ARENA.w,ARENA.h,0,0,preview.width,preview.height);
   pctx.fillStyle="rgba(5,10,7,.72)";pctx.fillRect(6,6,preview.width-12,19);
   pctx.fillStyle="#c5e36b";pctx.font="bold 10px monospace";pctx.textAlign="left";
-  pctx.fillText(({forest:"FLORESTA",neon:"NEON CITY",desert:"DESERTO",ice:"GELO"})[selectedTheme]||"ARENA",12,19);
+  pctx.fillText(({forest:"FLORESTA",neon:"NEON CITY",desert:"DESERTO",ice:"GELO ANTIGO",tundra:"TUNDRA / PINGUINS",volcano:"VULCÃO",jungle:"SELVA",city:"CIDADE EM RUÍNAS"})[selectedTheme]||"ARENA",12,19);
 }
 buildMap();
 
@@ -295,16 +335,18 @@ function drawBullets(dt){
     const k=1-Math.exp(-dt/38);
     r.x+=(b.x-r.x)*k;r.y+=(b.y-r.y)*k;
     ctx.save();ctx.translate(r.x,r.y);ctx.rotate(Math.atan2(b.vy,b.vx));
-    const bomb=b.type==="bomb", flame=b.type==="flame";
+    const bomb=b.type==="bomb", flame=b.type==="flame", rocket=b.type==="rocket";
     if(flame){
       const flicker=.78+Math.sin(performance.now()/32+b.id)*.22;
       const fire=ctx.createLinearGradient(-34,0,15,0);fire.addColorStop(0,"rgba(255,45,12,0)");fire.addColorStop(.35,"#ff4a16");fire.addColorStop(.72,"#ffb12f");fire.addColorStop(1,"#fff2a0");
       ctx.shadowColor="#ff4a16";ctx.shadowBlur=22;ctx.fillStyle=fire;ctx.beginPath();ctx.moveTo(-34,-7*flicker);ctx.quadraticCurveTo(-8,-13*flicker,16,0);ctx.quadraticCurveTo(-8,13*flicker,-34,7*flicker);ctx.closePath();ctx.fill();
       ctx.strokeStyle="rgba(255,235,145,.9)";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-22,0);ctx.quadraticCurveTo(-3,-3*flicker,13,0);ctx.stroke();
+    }else if(rocket){
+      const trail=ctx.createLinearGradient(-34,0,12,0);trail.addColorStop(0,"rgba(255,100,35,0)");trail.addColorStop(1,"#ffb45c");ctx.shadowColor="#ff6b32";ctx.shadowBlur=20;ctx.fillStyle=trail;ctx.fillRect(-34,-5,34,10);ctx.fillStyle="#d9e5ed";ctx.beginPath();ctx.moveTo(-9,-6);ctx.lineTo(12,0);ctx.lineTo(-9,6);ctx.closePath();ctx.fill();ctx.fillStyle="#ff6b32";ctx.fillRect(-15,-8,5,16);
     }else{
-      ctx.shadowColor=bomb?"#ff765c":"#ffe49a";ctx.shadowBlur=bomb?22:15;
-      ctx.strokeStyle=bomb?"#ff8c68":"#fff4c7";ctx.lineWidth=bomb?8:4;ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(7,0);ctx.stroke();
-      ctx.fillStyle=bomb?"#ff5d43":"#f2c96b";ctx.beginPath();ctx.arc(0,0,bomb?7:4,0,Math.PI*2);ctx.fill();
+      ctx.shadowColor=bomb?"#ff765c":"#ffe49a";ctx.shadowBlur=bomb?28:15;
+      ctx.strokeStyle=bomb?"#ff8c68":"#fff4c7";ctx.lineWidth=bomb?10:4;ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(7,0);ctx.stroke();
+      ctx.fillStyle=bomb?"#ff5d43":"#f2c96b";ctx.beginPath();ctx.arc(0,0,bomb?9:4,0,Math.PI*2);ctx.fill();
     }
     if(bomb && b.fuseLeft>0){ctx.rotate(-Math.atan2(b.vy,b.vx));ctx.fillStyle="#fff";ctx.font="bold 11px monospace";ctx.textAlign="center";ctx.fillText((b.fuseLeft/1000).toFixed(1)+"s",0,-15);}
     ctx.restore();
