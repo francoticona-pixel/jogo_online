@@ -39,21 +39,13 @@ const powers = {
 };
 const playerColors = ["#c5e36b", "#e46d5c", "#62c3dc", "#d7a6f5", "#f0bb62", "#69d0a4", "#f07caa", "#98a8ff", "#d6dfed", "#d2db70"];
 const walls = [
-  { x: 250, y: 250, w: 250, h: 70 }, { x: 1500, y: 250, w: 250, h: 70 },
-  { x: 250, y: 980, w: 250, h: 70 }, { x: 1500, y: 980, w: 250, h: 70 },
-  { x: 920, y: 250, w: 160, h: 260 }, { x: 920, y: 790, w: 160, h: 260 },
-  { x: 500, y: 520, w: 210, h: 90 }, { x: 1290, y: 690, w: 210, h: 90 },
-  { x: 720, y: 850, w: 110, h: 190 }, { x: 1170, y: 260, w: 110, h: 190 },
-  { x: 350, y: 650, w: 90, h: 250 }, { x: 1560, y: 430, w: 90, h: 250 },
-  { x: 720, y: 390, w: 150, h: 55 }, { x: 1130, y: 855, w: 150, h: 55 },
-  { x: 850, y: 620, w: 100, h: 70 }, { x: 1050, y: 620, w: 100, h: 70 },
-  { x: 560, y: 850, w: 80, h: 80 }, { x: 1360, y: 370, w: 80, h: 80 },
-  { x: 90, y: 470, w: 125, h: 65 }, { x: 1780, y: 760, w: 125, h: 65 },
-  { x: 610, y: 220, w: 75, h: 145 }, { x: 1315, y: 930, w: 75, h: 145 },
-  { x: 430, y: 410, w: 85, h: 85 }, { x: 1485, y: 805, w: 85, h: 85 },
-  { x: 760, y: 590, w: 95, h: 95 }, { x: 1145, y: 590, w: 95, h: 95 },
-  { x: 1010, y: 430, w: 65, h: 115 }, { x: 925, y: 755, w: 65, h: 115 },
-  { x: 250, y: 760, w: 95, h: 60 }, { x: 1655, y: 505, w: 95, h: 60 }
+  { x: 300, y: 300, w: 105, h: 105 }, { x: 770, y: 250, w: 135, h: 95 },
+  { x: 1510, y: 300, w: 115, h: 115 }, { x: 420, y: 850, w: 150, h: 90 },
+  { x: 970, y: 250, w: 95, h: 175 }, { x: 1390, y: 780, w: 155, h: 100 },
+  { x: 1700, y: 950, w: 110, h: 110 }, { x: 220, y: 650, w: 110, h: 150 },
+  { x: 650, y: 570, w: 125, h: 100 }, { x: 1220, y: 500, w: 130, h: 105 },
+  { x: 920, y: 900, w: 160, h: 90 }, { x: 1660, y: 560, w: 100, h: 145 },
+  { x: 560, y: 180, w: 90, h: 95 }, { x: 1120, y: 1080, w: 115, h: 90 }
 ];
 const mapCanvas = document.createElement("canvas");
 mapCanvas.width = ARENA.w;
@@ -111,20 +103,51 @@ function buildMap() {
   for(const [x,y] of [[260,470],[1740,830],[1000,650]]){mapCtx.beginPath();mapCtx.arc(x,y,92,0,Math.PI*2);mapCtx.stroke();mapCtx.beginPath();mapCtx.arc(x,y,118,0,Math.PI*2);mapCtx.stroke();}
   mapCtx.restore();
   // Ilhas de cobertura visual: pedras/vegetação fora das rotas principais.
-  for(let i=0;i<42;i++){
+  for(let i=0;i<18;i++){
     const x=170+((i*347)%1660), y=160+((i*193)%980);
     if(walls.some(w=>x>w.x-55&&x<w.x+w.w+55&&y>w.y-55&&y<w.y+w.h+55)) continue;
     mapCtx.fillStyle=i%2? "rgba(8,18,13,.22)" : "rgba(220,230,190,.07)";
     mapCtx.beginPath();mapCtx.ellipse(x,y,18+(i%4)*5,10+(i%3)*4,(i%5)*.35,0,Math.PI*2);mapCtx.fill();
   }
+  // Obstáculos físicos com aparência própria em cada bioma.
   for (const w of walls) {
-    mapCtx.save(); mapCtx.shadowColor = "rgba(0,0,0,.5)"; mapCtx.shadowBlur = 18; mapCtx.shadowOffsetY = 9;
-    const grad = mapCtx.createLinearGradient(w.x,w.y,w.x,w.y+w.h);
-    grad.addColorStop(0,palette[2]); grad.addColorStop(.18,palette[3]); grad.addColorStop(1,palette[4]);
-    mapCtx.fillStyle = grad; mapCtx.fillRect(w.x,w.y,w.w,w.h); mapCtx.restore();
-    mapCtx.strokeStyle = selectedTheme==="neon"?"#c59cff":selectedTheme==="ice"?"#c7f2ff":selectedTheme==="desert"?"#f2d19a":"#a9b99c"; mapCtx.lineWidth = 3; mapCtx.strokeRect(w.x+1.5,w.y+1.5,w.w-3,w.h-3);
-    mapCtx.strokeStyle = "rgba(10,20,15,.55)"; mapCtx.lineWidth = 2;
-    for (let x=w.x+12;x<w.x+w.w-5;x+=28) { mapCtx.beginPath(); mapCtx.moveTo(x,w.y+7); mapCtx.lineTo(x,w.y+w.h-7); mapCtx.stroke(); }
+    const cx=w.x+w.w/2, cy=w.y+w.h/2, r=Math.min(w.w,w.h)*.48;
+    mapCtx.save();mapCtx.shadowColor="rgba(0,0,0,.42)";mapCtx.shadowBlur=15;mapCtx.shadowOffsetY=8;
+    if(selectedTheme==="forest" || selectedTheme==="jungle"){
+      mapCtx.fillStyle="#493b29";mapCtx.fillRect(cx-9,cy+8,18,Math.max(22,w.h*.36));
+      const greens=selectedTheme==="forest"?["#244d31","#326b3d","#4b8446"]:["#164b2d","#23723b","#4b913d"];
+      for(let k=0;k<3;k++){const ox=(k-1)*r*.48,oy=(k%2)*-r*.25;mapCtx.fillStyle=greens[k];mapCtx.beginPath();mapCtx.arc(cx+ox,cy+oy,r*(.58+(k===1?.18:0)),0,Math.PI*2);mapCtx.fill();}
+      mapCtx.shadowBlur=0;mapCtx.strokeStyle="rgba(183,224,132,.5)";mapCtx.lineWidth=3;mapCtx.beginPath();mapCtx.arc(cx,cy-r*.12,r*.8,0,Math.PI*2);mapCtx.stroke();
+      if(selectedTheme==="jungle"){mapCtx.strokeStyle="#a2bd54";mapCtx.lineWidth=5;mapCtx.beginPath();mapCtx.moveTo(cx-r,cy-r);mapCtx.quadraticCurveTo(cx+r,cy,cx-r*.2,cy+r);mapCtx.stroke();}
+    }else if(selectedTheme==="ice" || selectedTheme==="tundra"){
+      mapCtx.fillStyle="#8bc9df";mapCtx.beginPath();mapCtx.moveTo(cx-w.w*.48,cy+r*.55);mapCtx.lineTo(cx-w.w*.36,cy-r*.55);mapCtx.lineTo(cx-w.w*.05,cy-r*.9);mapCtx.lineTo(cx+w.w*.18,cy-r*.5);mapCtx.lineTo(cx+w.w*.48,cy+r*.55);mapCtx.closePath();mapCtx.fill();
+      mapCtx.shadowBlur=0;mapCtx.fillStyle="rgba(255,255,255,.62)";mapCtx.beginPath();mapCtx.moveTo(cx-w.w*.36,cy-r*.55);mapCtx.lineTo(cx-w.w*.05,cy-r*.9);mapCtx.lineTo(cx+w.w*.18,cy-r*.5);mapCtx.lineTo(cx,cy-r*.25);mapCtx.closePath();mapCtx.fill();
+      mapCtx.strokeStyle="#d9f8ff";mapCtx.lineWidth=3;mapCtx.stroke();
+    }else if(selectedTheme==="desert"){
+      mapCtx.fillStyle="#a87942";mapCtx.beginPath();mapCtx.ellipse(cx,cy,w.w*.49,w.h*.48,0,Math.PI,Math.PI*2);mapCtx.lineTo(cx+w.w*.49,cy+r*.45);mapCtx.lineTo(cx-w.w*.49,cy+r*.45);mapCtx.closePath();mapCtx.fill();
+      mapCtx.fillStyle="#d9b477";mapCtx.beginPath();mapCtx.ellipse(cx-w.w*.12,cy-r*.08,w.w*.34,w.h*.18,-.15,Math.PI,Math.PI*2);mapCtx.fill();
+      if(w.w<120){mapCtx.fillStyle="#376b3e";mapCtx.fillRect(cx-5,cy-r,10,r*1.5);mapCtx.fillRect(cx-20,cy-r*.5,15,8);mapCtx.fillRect(cx+5,cy-r*.15,15,8);}
+    }else if(selectedTheme==="volcano"){
+      mapCtx.fillStyle="#39252a";mapCtx.beginPath();mapCtx.moveTo(cx-w.w*.5,cy+r*.5);mapCtx.lineTo(cx-w.w*.4,cy-r*.4);mapCtx.lineTo(cx-w.w*.1,cy-r*.8);mapCtx.lineTo(cx+w.w*.12,cy-r*.48);mapCtx.lineTo(cx+w.w*.43,cy-r*.35);mapCtx.lineTo(cx+w.w*.5,cy+r*.5);mapCtx.closePath();mapCtx.fill();
+      mapCtx.shadowBlur=0;mapCtx.strokeStyle="#ff7844";mapCtx.lineWidth=4;mapCtx.beginPath();mapCtx.moveTo(cx-w.w*.1,cy-r*.6);mapCtx.lineTo(cx+w.w*.02,cy);mapCtx.lineTo(cx-w.w*.12,cy+r*.42);mapCtx.stroke();
+    }else if(selectedTheme==="city"){
+      mapCtx.fillStyle="#46515e";mapCtx.fillRect(w.x,w.y,w.w,w.h);mapCtx.fillStyle="#252e3a";mapCtx.fillRect(w.x+8,w.y+8,w.w-16,w.h-16);
+      mapCtx.fillStyle="#f1c66d";for(let wx=w.x+14;wx<w.x+w.w-8;wx+=28)for(let wy=w.y+14;wy<w.y+w.h-8;wy+=28)mapCtx.fillRect(wx,wy,10,12);
+      mapCtx.strokeStyle="#9daaba";mapCtx.lineWidth=3;mapCtx.strokeRect(w.x+2,w.y+2,w.w-4,w.h-4);
+    }else{
+      mapCtx.fillStyle="#4b3a70";mapCtx.fillRect(w.x,w.y,w.w,w.h);mapCtx.strokeStyle="#d6a6ff";mapCtx.lineWidth=4;mapCtx.strokeRect(w.x+3,w.y+3,w.w-6,w.h-6);
+      mapCtx.shadowBlur=18;mapCtx.shadowColor="#bb75ff";mapCtx.fillStyle="rgba(184,105,255,.25)";mapCtx.fillRect(w.x+10,w.y+10,w.w-20,w.h-20);
+    }
+    mapCtx.restore();
+  }
+  if(selectedTheme==="ice" || selectedTheme==="tundra"){
+    for(const [px,py] of [[1840,1160],[1910,1190],[1770,1215],[1950,1125],[1690,1170]]){
+      mapCtx.fillStyle="#182d3b";mapCtx.beginPath();mapCtx.ellipse(px,py,11,17,0,0,Math.PI*2);mapCtx.fill();
+      mapCtx.fillStyle="#f5fbff";mapCtx.beginPath();mapCtx.ellipse(px,py-1,7,12,0,0,Math.PI*2);mapCtx.fill();
+      mapCtx.fillStyle="#ffb94d";mapCtx.beginPath();mapCtx.moveTo(px+7,py-5);mapCtx.lineTo(px+17,py-1);mapCtx.lineTo(px+7,py+2);mapCtx.fill();
+      mapCtx.fillRect(px-7,py+14,6,4);mapCtx.fillRect(px+2,py+14,6,4);
+    }
+    mapCtx.fillStyle="#eafaff";mapCtx.font="bold 13px monospace";mapCtx.fillText("COLÔNIA DE PINGUINS • ÁREA SEGURA",1650,1270);
   }
   mapCtx.strokeStyle = "rgba(197,227,107,.45)"; mapCtx.lineWidth = 4; mapCtx.setLineDash([16,14]);
   mapCtx.strokeRect(20,20,ARENA.w-40,ARENA.h-40); mapCtx.setLineDash([]);
