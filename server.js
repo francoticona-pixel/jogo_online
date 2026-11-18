@@ -170,7 +170,7 @@ function randomFreePoint(room, ignorePlayerId = null) {
 function spawnCrate(room) {
   if (room.crates.length >= 3) return;
   const spot = randomFreePoint(room);
-  const types = ["rapid","speed","triple","shield","invisibility","clone","bomb","flame","rocket","armor","rapid","speed","triple","shield","clone","bomb","flame","medkit","electric","electric","phase","phase","blades","blades","blackhole","timeStop"];
+  const types = ["rapid","speed","triple","shield","invisibility","clone","bomb","flame","rocket","armor","rapid","speed","triple","shield","clone","bomb","flame","medkit","medkit","electric","electric","phase","phase","blades","blades","blackhole","timeStop"];
   room.crateCounter++;
   room.crates.push({
     id: room.crateCounter,
@@ -525,7 +525,7 @@ setInterval(() => {
       for (let i = room.crates.length - 1; i >= 0; i--) {
         const crate = room.crates[i];
         if (Math.hypot(p.x - crate.x, p.y - crate.y) >= 30) continue;
-        p.power = crate.type;
+        if (crate.type !== "medkit") p.power = crate.type;
         p.powerUntil = now + POWER_DURATION;
         if (crate.type === "invisibility") p.invisibleUntil = now + 7800;
         if (crate.type === "shield") { p.powerUntil = now + 6000; p.invulnerableUntil = now + 6000; }
@@ -536,7 +536,7 @@ setInterval(() => {
         if (crate.type === "blades") { p.powerUntil = now + 8500; p.bladeUntil = now + 8500; p.bladeNextHit = now; }
         if (crate.type === "blackhole") p.powerUntil = now + 12000;
         if (crate.type === "timeStop") { p.powerUntil = now + 3000; room.timeStop = { owner:p.id, endsAt:now + 3000 }; }
-        if (crate.type === "medkit") { p.hp = Math.min(100, p.hp + 55); p.powerUntil = now + 2500; }
+        if (crate.type === "medkit") { p.hp = Math.min(100, p.hp + 50); p.power = null; p.powerUntil = 0; }
         if (crate.type === "life") { p.lives = Math.min(5, p.lives + 1); p.powerUntil = now + 2500; }
         if (crate.type === "clone") {
           spawnClones(room, p, now);
