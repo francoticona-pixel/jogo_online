@@ -431,32 +431,37 @@ $("skinSelect").addEventListener("change",e=>{selectedSkin=e.target.value;drawTa
 $("mapSelect").addEventListener("change",e=>{selectedTheme=e.target.value;buildMap();});
 function drawTankArt(pctx,cx,cy,scale,color,skin){
   pctx.save();pctx.translate(cx,cy);pctx.scale(scale,scale);
-  const grad=(x,y,w,h,a,b)=>{const g=pctx.createLinearGradient(x,y,x+w,y+h);g.addColorStop(0,a);g.addColorStop(.48,b);g.addColorStop(1,a);return g;};
-  // Sombra e esteiras segmentadas
-  pctx.fillStyle="rgba(0,0,0,.38)";pctx.beginPath();pctx.ellipse(0,8,33,23,0,0,Math.PI*2);pctx.fill();
-  pctx.fillStyle="#111820";pctx.beginPath();pctx.roundRect(-29,-21,58,42,10);pctx.fill();
-  pctx.fillStyle=grad(-26,-19,52,38,"#66727b","#252f38");pctx.beginPath();pctx.roundRect(-26,-19,52,38,8);pctx.fill();
-  for(let y=-15;y<=13;y+=7){pctx.fillStyle="#9aa4a8";pctx.fillRect(-24,y,4,3);pctx.fillRect(20,y,4,3);}
-  for(let x=-17;x<=13;x+=10){pctx.fillStyle="#0c1117";pctx.beginPath();pctx.arc(x,-17,2.3,0,Math.PI*2);pctx.arc(x,17,2.3,0,Math.PI*2);pctx.fill();}
-  // Chassi facetado e placas laterais
-  pctx.fillStyle=grad(-19,-15,38,30,"#f0f3e8",color);pctx.beginPath();pctx.roundRect(-19,-15,38,30,7);pctx.fill();
-  pctx.fillStyle="rgba(255,255,255,.32)";pctx.beginPath();pctx.moveTo(-13,-11);pctx.lineTo(11,-11);pctx.lineTo(5,-6);pctx.lineTo(-13,-6);pctx.closePath();pctx.fill();
-  pctx.fillStyle="rgba(0,0,0,.2)";pctx.fillRect(-16,7,32,4);
-  pctx.strokeStyle="rgba(12,20,26,.7)";pctx.lineWidth=1.5;pctx.strokeRect(-15,-10,7,20);pctx.strokeRect(8,-10,7,20);
-  // Torreta rotativa, escotilha e detalhes
-  pctx.fillStyle="#17232b";pctx.beginPath();pctx.arc(0,0,11,0,Math.PI*2);pctx.fill();
-  pctx.fillStyle=grad(-9,-9,18,18,"#dce5df",color);pctx.beginPath();pctx.roundRect(-9,-9,18,18,6);pctx.fill();
-  pctx.fillStyle="rgba(255,255,255,.4)";pctx.beginPath();pctx.ellipse(-3,-5,4,2,-.3,0,Math.PI*2);pctx.fill();
-  pctx.strokeStyle="rgba(16,24,30,.8)";pctx.lineWidth=2;pctx.beginPath();pctx.arc(0,0,7,0,Math.PI*2);pctx.stroke();
-  // Canhão metálico com anéis e boca
-  pctx.fillStyle=grad(3,-3,38,6,"#e9eef0","#667985");pctx.beginPath();pctx.roundRect(5,-3.5,34,7,3);pctx.fill();
-  pctx.fillStyle="#253541";pctx.fillRect(29,-4,4,8);pctx.fillStyle="#dce5e8";pctx.fillRect(37,-4,4,8);
-  pctx.fillStyle="#101820";pctx.beginPath();pctx.ellipse(41,0,2.5,3.2,0,0,Math.PI*2);pctx.fill();
-  // rebites, riscos de pintura e marca central
-  pctx.fillStyle="#e8f0e8";for(const [x,y] of [[-14,-10],[14,-10],[-14,10],[14,10]]){pctx.beginPath();pctx.arc(x,y,1.2,0,Math.PI*2);pctx.fill();}
-  pctx.fillStyle=skin==="gold"?"#fff0a6":skin==="ice"?"#eaffff":skin==="toxic"?"#e0ff9a":"#f4f4df";pctx.fillRect(-3,-2,6,4);
+  const metal=(x,y,w,h,c1,c2)=>{const g=pctx.createLinearGradient(x,y,x+w,y+h);g.addColorStop(0,c1);g.addColorStop(.5,c2);g.addColorStop(1,c1);return g;};
+  // Sombra e esteiras com rodas individuais.
+  pctx.fillStyle="rgba(0,0,0,.42)";pctx.beginPath();pctx.ellipse(1,10,36,25,.05,0,Math.PI*2);pctx.fill();
+  pctx.fillStyle="#080e14";pctx.beginPath();pctx.roundRect(-32,-23,64,46,11);pctx.fill();
+  pctx.fillStyle=metal(-30,-20,60,40,"#87939a","#202b34");pctx.beginPath();pctx.roundRect(-29,-20,58,40,9);pctx.fill();
+  for(const side of [-1,1]){
+    for(let x=-21;x<=21;x+=10){pctx.fillStyle="#111a21";pctx.beginPath();pctx.arc(x,side*17,5,0,Math.PI*2);pctx.fill();pctx.fillStyle="#a5b0b5";pctx.beginPath();pctx.arc(x,side*17,2.2,0,Math.PI*2);pctx.fill();}
+    pctx.strokeStyle="#c0c9c9";pctx.lineWidth=1.3;pctx.beginPath();pctx.moveTo(-25,side*22);pctx.lineTo(25,side*22);pctx.stroke();
+  }
+  // Casco principal facetado, com placas sobrepostas.
+  pctx.fillStyle="#111b22";pctx.beginPath();pctx.moveTo(-22,-14);pctx.lineTo(-13,-19);pctx.lineTo(16,-18);pctx.lineTo(23,-10);pctx.lineTo(23,11);pctx.lineTo(14,18);pctx.lineTo(-16,17);pctx.lineTo(-23,9);pctx.closePath();pctx.fill();
+  pctx.fillStyle=metal(-20,-17,42,34,"#f1f4e8",color);pctx.beginPath();pctx.moveTo(-19,-13);pctx.lineTo(-12,-16);pctx.lineTo(14,-15);pctx.lineTo(19,-8);pctx.lineTo(19,8);pctx.lineTo(12,14);pctx.lineTo(-13,14);pctx.lineTo(-19,7);pctx.closePath();pctx.fill();
+  pctx.fillStyle="rgba(255,255,255,.34)";pctx.beginPath();pctx.moveTo(-13,-12);pctx.lineTo(9,-12);pctx.lineTo(3,-7);pctx.lineTo(-14,-7);pctx.closePath();pctx.fill();
+  pctx.fillStyle="rgba(0,0,0,.24)";pctx.fillRect(-13,8,26,3);
+  pctx.strokeStyle="rgba(7,14,20,.72)";pctx.lineWidth=1.4;pctx.strokeRect(-15,-5,5,10);pctx.strokeRect(10,-5,5,10);
+  // Escotilha e torre giratória.
+  pctx.fillStyle="#111a20";pctx.beginPath();pctx.arc(-5,0,10,0,Math.PI*2);pctx.fill();
+  pctx.fillStyle=metal(-10,-10,20,20,"#f0f4ed",color);pctx.beginPath();pctx.roundRect(-9,-9,18,18,6);pctx.fill();
+  pctx.strokeStyle="rgba(12,22,28,.8)";pctx.lineWidth=2;pctx.beginPath();pctx.arc(-5,0,6,0,Math.PI*2);pctx.stroke();
+  pctx.fillStyle="rgba(255,255,255,.45)";pctx.beginPath();pctx.ellipse(-8,-5,3.5,1.8,-.3,0,Math.PI*2);pctx.fill();
+  // Canhão reforçado com anéis e freio de boca.
+  pctx.fillStyle="#101820";pctx.beginPath();pctx.roundRect(1,-4.5,42,9,3);pctx.fill();
+  pctx.fillStyle=metal(2,-4,40,8,"#e5ecee","#536571");pctx.beginPath();pctx.roundRect(2,-3.2,38,6.4,2);pctx.fill();
+  pctx.fillStyle="#1b2932";pctx.fillRect(29,-5,4,10);pctx.fillStyle="#dce6e8";pctx.fillRect(38,-5,4,10);
+  pctx.fillStyle="#0b1117";pctx.beginPath();pctx.ellipse(42,0,2.5,3.7,0,0,Math.PI*2);pctx.fill();
+  // Rebites e luz frontal.
+  pctx.fillStyle="#dbe5e4";for(const [x,y] of [[-16,-11],[15,-11],[-16,11],[15,11]]){pctx.beginPath();pctx.arc(x,y,1.35,0,Math.PI*2);pctx.fill();}
+  pctx.fillStyle=skin==="gold"?"#fff0a6":skin==="ice"?"#eaffff":skin==="toxic"?"#e0ff9a":"#f4f4df";pctx.fillRect(-22,-3,3,6);
   pctx.restore();
 }
+
 function drawTankPreview(){
   const preview=$("tankPreview");if(!preview)return;
   const pctx=preview.getContext("2d");pctx.clearRect(0,0,preview.width,preview.height);
