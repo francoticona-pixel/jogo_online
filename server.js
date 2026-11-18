@@ -52,11 +52,11 @@ function circleHitsRect(x, y, radius, rect) {
 function hitsWall(x, y, radius = PLAYER_RADIUS) {
   return WALLS.some(w => circleHitsRect(x, y, radius, w));
 }
-function movePlayer(p, dx, dy) {
+function movePlayer(p, dx, dy, ignoreWalls = false) {
   const nx = clamp(p.x + dx, PLAYER_RADIUS, ARENA.w - PLAYER_RADIUS);
   const ny = clamp(p.y + dy, PLAYER_RADIUS, ARENA.h - PLAYER_RADIUS);
-  if (!hitsWall(nx, p.y)) p.x = nx;
-  if (!hitsWall(p.x, ny)) p.y = ny;
+  if (ignoreWalls || !hitsWall(nx, p.y)) p.x = nx;
+  if (ignoreWalls || !hitsWall(p.x, ny)) p.y = ny;
 }
 function spawnPoint(index) {
   const point = SPAWNS[index % SPAWNS.length];
@@ -86,6 +86,9 @@ function roomState(room) {
       power: p.powerUntil > now ? p.power : null,
       powerLeft: p.powerUntil > now ? p.powerUntil - now : 0,
       invisible: p.invisibleUntil > now,
+      phased: p.phaseUntil > now,
+      stunnedLeft: Math.max(0, p.stunnedUntil - now),
+      blades: p.bladeUntil > now,
       invulnerableLeft: Math.max(0, p.invulnerableUntil - now),
       name: p.name || ("OP " + String(p.number).padStart(2,"0")),
       skin: p.skin || "classic"
@@ -101,6 +104,8 @@ function roomState(room) {
       x: e.x, y: e.y, radius: e.radius,
       remaining: Math.max(0, e.expiresAt - now)
     })),
+    blackholes: (room.blackholes || []).map(b => ({ x:b.x, y:b.y, radius:b.radius, remaining:Math.max(0,b.expiresAt-now) })),
+    timeStop: room.timeStop && room.timeStop.endsAt > now ? { owner:room.timeStop.owner, remaining:room.timeStop.endsAt-now } : null,
     rankings: room.rankings,
     theme: room.theme || "forest",
     gas: room.gas ? { x: room.gas.x, y: room.gas.y, radius: room.gas.radius, remaining: Math.max(0, room.gas.endsAt - now) } : null
@@ -135,6 +140,10 @@ function resetPlayer(p, index, resetLives = false, room = null) {
   p.power = null;
   p.powerUntil = 0;
   p.invisibleUntil = 0;
+  p.phaseUntil = 0;
+  p.stunnedUntil = 0;
+  p.bladeUntil = 0;
+  p.bladeNextHit = 0;
   p.input = { up: false, down: false, left: false, right: false, shoot: false };
   p.nextShot = 0;
   p.respawnAt = 0;
@@ -169,7 +178,7 @@ function randomFreePoint(room, ignorePlayerId = null) {
 function spawnCrate(room) {
   if (room.crates.length >= 3) return;
   const spot = randomFreePoint(room);
-  const types = ["rapid","speed","triple","shield","invisibility","clone","bomb","flame","rocket","armor","rapid","speed","triple","shield","clone","bomb","flame","medkit"];
+  const types = ["rapid","speed","triple","shield","invisibility","clone","bomb","flame","rocket","armor","rapid","speed","triple","shield","clone","bomb","flame","medkit","electric","electric","phase","phase","blades","blades","blackhole","timeStop"];
   room.crateCounter++;
   room.crates.push({
     id: room.crateCounter,
@@ -207,11 +216,12 @@ function createProjectile(room, player, angle, type = "normal") {
     owner: player.id,
     x: player.x + Math.cos(angle) * (bomb ? 30 : 23),
     y: player.y + Math.sin(angle) * (bomb ? 30 : 23),
-    vx: Math.cos(angle) * (bomb ? 7.2 : type === "flame" ? 10.5 : type === "rocket" ? 9.5 : 12),
-    vy: Math.sin(angle) * (bomb ? 7.2 : type === "flame" ? 10.5 : type === "rocket" ? 9.5 : 12),
-    life: bomb ? 105 : type === "flame" ? 26 : type === "rocket" ? 95 : 75,
-    damage: bomb ? 68 : type === "flame" ? 7 : type === "rocket" ? 38 : 20,
+    vx: Math.cos(angle) * (bomb ? 7.2 : type === "flame" ? 10.5 : type === "rocket" ? 9.5 : type === "blackhole" ? 8.2 : type === "electric" ? 11.5 : 12),
+    vy: Math.sin(angle) * (bomb ? 7.2 : type === "flame" ? 10.5 : type === "rocket" ? 9.5 : type === "blackhole" ? 8.2 : type === "electric" ? 11.5 : 12),
+    life: bomb ? 105 : type === "flame" ? 26 : type === "rocket" ? 95 : type === "blackhole" ? 82 : 75,
+    damage: bomb ? 68 : type === "flame" ? 7 : type === "rocket" ? 38 : type === "electric" ? 14 : type === "blackhole" ? 0 : 20,
     type,
+    ignoresWalls: !!(player.phaseUntil > Date.now()),
     fuseAt: 0
   });
   if (room.bullets.length > MAX_BULLETS_PER_ROOM) {
@@ -291,6 +301,8 @@ function finishRoom(room) {
   room.crates = [];
   room.clones = [];
   room.explosions = [];
+  room.blackholes = [];
+  room.timeStop = null;
   broadcastRoomInfo(room);
   // Resultado final é crítico: não usar volatile, pois o pacote não pode ser descartado.
   const finalState = roomState(room);
@@ -312,6 +324,8 @@ function startRoom(room) {
   room.crates = [];
   room.clones = [];
   room.explosions = [];
+  room.blackholes = [];
+  room.timeStop = null;
   room.gas = { x: ARENA.w / 2, y: ARENA.h / 2, radius: 1050, startAt: Date.now() + 18000, endsAt: Date.now() + 198000 };
   room.players.forEach(p => {
     p.score = 0;
@@ -350,6 +364,8 @@ io.on("connection", socket => {
         crates: [],
         clones: [],
         explosions: [],
+        blackholes: [],
+        timeStop: null,
         rankings: [],
         winnerId: null,
         crateCounter: 0,
@@ -391,6 +407,10 @@ io.on("connection", socket => {
       power: null,
       powerUntil: 0,
       invisibleUntil: 0,
+      phaseUntil: 0,
+      stunnedUntil: 0,
+      bladeUntil: 0,
+      bladeNextHit: 0,
       input: { up: false, down: false, left: false, right: false, shoot: false },
       nextShot: 0,
       respawnAt: 0,
@@ -477,12 +497,18 @@ setInterval(() => {
         p.powerUntil = 0;
       }
       if (p.invisibleUntil <= now) p.invisibleUntil = 0;
+      if (p.phaseUntil <= now) p.phaseUntil = 0;
+      if (p.stunnedUntil <= now) p.stunnedUntil = 0;
+      if (p.bladeUntil <= now) p.bladeUntil = 0;
+      if (room.timeStop && room.timeStop.endsAt <= now) room.timeStop = null;
+      if (room.timeStop && room.timeStop.owner !== p.id) continue;
+      if (p.stunnedUntil > now) continue;
 
       const dx = (p.input.right ? 1 : 0) - (p.input.left ? 1 : 0);
       const dy = (p.input.down ? 1 : 0) - (p.input.up ? 1 : 0);
       const length = Math.hypot(dx, dy) || 1;
       const speed = p.power === "speed" ? 9.0 : 7.2;
-      movePlayer(p, dx / length * speed, dy / length * speed);
+      movePlayer(p, dx / length * speed, dy / length * speed, p.phaseUntil > now);
 
       let fireDelay = 275;
       if (p.power === "rapid") fireDelay = 125;
@@ -490,6 +516,8 @@ setInterval(() => {
       else if (p.power === "bomb") fireDelay = 850;
       else if (p.power === "rocket") fireDelay = 720;
       else if (p.power === "flame") fireDelay = 90;
+      else if (p.power === "electric") fireDelay = 420;
+      else if (p.power === "blackhole") fireDelay = 1200;
       if (p.input.shoot && now >= p.nextShot) {
         p.nextShot = now + fireDelay;
         if (p.power === "triple") {
@@ -497,7 +525,8 @@ setInterval(() => {
           createProjectile(room, p, p.angle);
           createProjectile(room, p, p.angle + 0.2);
         } else {
-          createProjectile(room, p, p.angle, p.power === "bomb" ? "bomb" : p.power === "flame" ? "flame" : p.power === "rocket" ? "rocket" : "normal");
+          createProjectile(room, p, p.angle, p.power === "bomb" ? "bomb" : p.power === "flame" ? "flame" : p.power === "rocket" ? "rocket" : p.power === "electric" ? "electric" : p.power === "blackhole" ? "blackhole" : "normal");
+          if (p.power === "blackhole") { p.power = null; p.powerUntil = 0; }
         }
       }
 
@@ -510,6 +539,11 @@ setInterval(() => {
         if (crate.type === "shield") { p.powerUntil = now + 6000; p.invulnerableUntil = now + 6000; }
         if (crate.type === "armor") p.powerUntil = now + 12000;
         if (crate.type === "rocket") p.powerUntil = now + 9000;
+        if (crate.type === "phase") { p.powerUntil = now + 8000; p.phaseUntil = now + 8000; }
+        if (crate.type === "electric") p.powerUntil = now + 9000;
+        if (crate.type === "blades") { p.powerUntil = now + 8500; p.bladeUntil = now + 8500; p.bladeNextHit = now; }
+        if (crate.type === "blackhole") p.powerUntil = now + 12000;
+        if (crate.type === "timeStop") { p.powerUntil = now + 3000; room.timeStop = { owner:p.id, endsAt:now + 3000 }; }
         if (crate.type === "medkit") { p.hp = Math.min(100, p.hp + 55); p.powerUntil = now + 2500; }
         if (crate.type === "life") { p.lives = Math.min(5, p.lives + 1); p.powerUntil = now + 2500; }
         if (crate.type === "clone") {
@@ -518,14 +552,28 @@ setInterval(() => {
         }
         room.crates.splice(i, 1);
       }
+      if (p.bladeUntil > now && now >= p.bladeNextHit) {
+        p.bladeNextHit = now + 420;
+        for (const target of players) {
+          if (target.id === p.id || !target.connected || target.lives <= 0 || target.hp <= 0) continue;
+          if (Math.hypot(target.x-p.x,target.y-p.y) <= 62) damagePlayer(room,target,18,p.id,now);
+        }
+      }
     }
 
     for (const bullet of room.bullets) {
+      if (room.timeStop && room.timeStop.endsAt > now && bullet.owner !== room.timeStop.owner) continue;
       const oldX = bullet.x;
       const oldY = bullet.y;
       bullet.x += bullet.vx;
       bullet.y += bullet.vy;
       bullet.life--;
+
+      if (bullet.type === "blackhole") {
+        const impact = hitsWall(bullet.x,bullet.y,9) || bullet.x < 12 || bullet.x > ARENA.w-12 || bullet.y < 12 || bullet.y > ARENA.h-12 || players.some(t=>t.id!==bullet.owner&&t.connected&&t.lives>0&&t.hp>0&&Math.hypot(t.x-bullet.x,t.y-bullet.y)<PLAYER_RADIUS+10);
+        if (impact || bullet.life <= 0) { room.blackholes.push({x:bullet.x,y:bullet.y,owner:bullet.owner,radius:390,createdAt:now,expiresAt:now+3600}); bullet.life=0; }
+        continue;
+      }
 
       if (bullet.type === "bomb") {
         if (!bullet.fuseAt) {
@@ -562,6 +610,21 @@ setInterval(() => {
         continue;
       }
 
+      if (bullet.type === "electric") {
+        const hitWall = !bullet.ignoresWalls && (hitsWall(bullet.x,bullet.y,BULLET_RADIUS) || WALLS.some(w=>circleHitsRect((oldX+bullet.x)/2,(oldY+bullet.y)/2,BULLET_RADIUS+6,w)));
+        if (hitWall || bullet.life <= 0) { bullet.life=0; continue; }
+        for (const target of players) {
+          if (target.id===bullet.owner || !target.connected || target.lives<=0 || target.hp<=0) continue;
+          if (Math.hypot(target.x-bullet.x,target.y-bullet.y)<PLAYER_RADIUS+BULLET_RADIUS+3) {
+            damagePlayer(room,target,bullet.damage,bullet.owner,now);
+            if (target.hp>0 && target.lives>0) target.stunnedUntil=Math.max(target.stunnedUntil||0,now+1800);
+            room.explosions.push({x:bullet.x,y:bullet.y,radius:48,expiresAt:now+260,electric:true});
+            bullet.life=0; break;
+          }
+        }
+        continue;
+      }
+
       if (bullet.type === "flame") {
         let flameHit = false;
         for (const target of players) {
@@ -571,8 +634,8 @@ setInterval(() => {
         if (flameHit || bullet.life <= 0 || hitsWall(bullet.x,bullet.y,5)) bullet.life=0;
         continue;
       }
-      const hitWall = hitsWall(bullet.x, bullet.y, BULLET_RADIUS) ||
-        WALLS.some(w => circleHitsRect((oldX + bullet.x) / 2, (oldY + bullet.y) / 2, BULLET_RADIUS + 6, w));
+      const hitWall = !bullet.ignoresWalls && (hitsWall(bullet.x, bullet.y, BULLET_RADIUS) ||
+        WALLS.some(w => circleHitsRect((oldX + bullet.x) / 2, (oldY + bullet.y) / 2, BULLET_RADIUS + 6, w)));
       if (hitWall) {
         bullet.life = 0;
         continue;
@@ -603,6 +666,18 @@ setInterval(() => {
     room.bullets = room.bullets.filter(b =>
       b.life > 0 && b.x > 0 && b.x < ARENA.w && b.y > 0 && b.y < ARENA.h
     );
+    for (const hole of room.blackholes || []) {
+      for (const target of players) {
+        if (target.id===hole.owner || !target.connected || target.lives<=0 || target.hp<=0) continue;
+        const dx=hole.x-target.x, dy=hole.y-target.y, distance=Math.hypot(dx,dy);
+        if (distance>hole.radius || distance<1) continue;
+        const pull=Math.min(13, 3.8 + (1-distance/hole.radius)*7);
+        target.x=clamp(target.x+dx/distance*pull,PLAYER_RADIUS,ARENA.w-PLAYER_RADIUS);
+        target.y=clamp(target.y+dy/distance*pull,PLAYER_RADIUS,ARENA.h-PLAYER_RADIUS);
+        if (distance < 48) damagePlayer(room,target,1000,hole.owner,now);
+      }
+    }
+    room.blackholes = (room.blackholes || []).filter(h=>h.expiresAt>now);
     for (const clone of room.clones) {
       const owner = room.players.get(clone.owner);
       if (!owner || !owner.connected || owner.lives <= 0 || owner.hp <= 0) continue;
