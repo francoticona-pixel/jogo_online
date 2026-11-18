@@ -53,14 +53,14 @@ mapCanvas.height = ARENA.h;
 const mapCtx = mapCanvas.getContext("2d");
 function buildMap() {
   const palettes = {
-    forest: ["#6f9e45","#315b36","#b7d66d","#3c7544"],
-    jungle: ["#3d8c45","#164c36","#9acb4e","#287052"],
-    ice: ["#b9e8f4","#5c9fca","#f5fdff","#79c6e8"],
-    tundra: ["#dceef2","#8db9ca","#ffffff","#6d9db4"],
-    desert: ["#f1c16e","#d88b45","#ffe0a0","#a95e37"],
-    volcano: ["#5a3436","#211d2a","#ff9a42","#a83e32"],
-    city: ["#657487","#394b61","#a9c4d6","#303e52"],
-    neon: ["#34265d","#171d46","#e35bff","#36d8ff"]
+    forest: ["#91bd59","#355f3d","#d5e88a","#4e874b"],
+    jungle: ["#4cae62","#164b3b","#b8dc68","#287b68"],
+    ice: ["#d9f5ff","#579fc9","#ffffff","#83d7ed"],
+    tundra: ["#eaf7f8","#83b9ca","#ffffff","#628fa8"],
+    desert: ["#f6d28a","#c87942","#ffe8ae","#a95b35"],
+    volcano: ["#65434b","#211e2b","#ffad4f","#a83e32"],
+    city: ["#8196a8","#354b61","#d1e3e8","#293b50"],
+    neon: ["#44336f","#171b3d","#ff68d9","#42eaff"]
   };
   const p = palettes[selectedTheme] || palettes.forest;
   const grad = mapCtx.createLinearGradient(0,0,ARENA.w,ARENA.h);
@@ -256,6 +256,70 @@ function buildMap() {
     }
     mapCtx.restore();
   }
+
+  // Pontos de interesse e acabamento cinematográfico: cada bioma ganha uma identidade própria.
+  // Esta camada é apenas visual; mantém intactas as colisões oficiais do servidor.
+  const scenicSeed=selectedTheme.split("").reduce((n,c)=>n*31+c.charCodeAt(0),9173)>>>0;
+  let scenicState=scenicSeed;
+  const scenicRand=()=>{scenicState=(scenicState*1664525+1013904223)>>>0;return scenicState/4294967296;};
+  const clearSpot=(x,y,pad=90)=>!walls.some(w=>x>w.x-pad&&x<w.x+w.w+pad&&y>w.y-pad&&y<w.y+w.h+pad);
+  mapCtx.save();
+  // Luz ambiente suave nas áreas de jogo e vinheta nas extremidades.
+  const ambience=mapCtx.createRadialGradient(1000,640,120,1000,640,1280);
+  ambience.addColorStop(0,"rgba(255,255,255,.10)");ambience.addColorStop(.72,"rgba(255,255,255,.015)");ambience.addColorStop(1,"rgba(5,12,20,.30)");
+  mapCtx.fillStyle=ambience;mapCtx.fillRect(0,0,ARENA.w,ARENA.h);
+  if(selectedTheme==="forest"||selectedTheme==="jungle"){
+    // Clareiras circulares e pequenos canteiros de samambaias.
+    for(const [x,y,r] of [[500,420,125],[1450,880,150],[1040,1080,90]]){
+      const g=mapCtx.createRadialGradient(x,y,8,x,y,r);g.addColorStop(0,"rgba(205,229,126,.16)");g.addColorStop(1,"rgba(38,91,48,0)");
+      mapCtx.fillStyle=g;mapCtx.beginPath();mapCtx.arc(x,y,r,0,Math.PI*2);mapCtx.fill();
+    }
+    for(let i=0;i<42;i++){const x=70+scenicRand()*1860,y=70+scenicRand()*1160;if(!clearSpot(x,y,45))continue;
+      mapCtx.save();mapCtx.translate(x,y);mapCtx.rotate(scenicRand()*Math.PI);
+      mapCtx.strokeStyle=i%2?"rgba(196,224,111,.62)":"rgba(25,92,56,.65)";mapCtx.lineWidth=3;
+      for(let k=0;k<4;k++){mapCtx.beginPath();mapCtx.moveTo(0,0);mapCtx.quadraticCurveTo((k-1.5)*7,-10,(k-1.5)*12,-22-scenicRand()*12);mapCtx.stroke();}
+      mapCtx.restore();
+    }
+  }else if(selectedTheme==="ice"||selectedTheme==="tundra"){
+    // Fendas de gelo facetadas e pequenos montes de neve.
+    for(let i=0;i<28;i++){const x=70+scenicRand()*1860,y=70+scenicRand()*1160;if(!clearSpot(x,y,48))continue;
+      mapCtx.save();mapCtx.translate(x,y);mapCtx.rotate(scenicRand()*Math.PI);
+      mapCtx.fillStyle="rgba(255,255,255,.24)";mapCtx.beginPath();mapCtx.moveTo(-22,8);mapCtx.lineTo(-5,-12);mapCtx.lineTo(3,-3);mapCtx.lineTo(22,-18);mapCtx.lineTo(11,12);mapCtx.closePath();mapCtx.fill();
+      mapCtx.strokeStyle="rgba(67,157,204,.35)";mapCtx.lineWidth=2;mapCtx.stroke();mapCtx.restore();
+    }
+    for(const [x,y] of [[270,330],[1760,720],[1080,180]]){mapCtx.save();mapCtx.shadowColor="#a8edff";mapCtx.shadowBlur=24;mapCtx.fillStyle="#9ceaff";mapCtx.beginPath();mapCtx.moveTo(x,y-45);mapCtx.lineTo(x+18,y+5);mapCtx.lineTo(x,y+25);mapCtx.lineTo(x-16,y+5);mapCtx.closePath();mapCtx.fill();mapCtx.restore();}
+  }else if(selectedTheme==="desert"){
+    // Ruínas antigas, pedras de marco e trilhas de areia.
+    mapCtx.save();mapCtx.globalAlpha=.34;mapCtx.strokeStyle="#fff0c1";mapCtx.lineWidth=12;mapCtx.lineCap="round";
+    for(const [x,y] of [[360,300],[1570,360],[1180,1030]]){mapCtx.beginPath();mapCtx.arc(x,y,58,Math.PI*.15,Math.PI*1.8);mapCtx.stroke();mapCtx.fillStyle="#8d573d";mapCtx.fillRect(x-8,y-72,16,32);}
+    mapCtx.restore();
+    for(let i=0;i<24;i++){const x=70+scenicRand()*1860,y=70+scenicRand()*1160;if(!clearSpot(x,y,48))continue;rock(x,y,.35+scenicRand()*.35,"#a95f3b","#f0c17b");}
+  }else if(selectedTheme==="volcano"){
+    // Campos de basalto, rachaduras incandescentes e brasas.
+    for(let i=0;i<34;i++){const x=70+scenicRand()*1860,y=70+scenicRand()*1160;if(!clearSpot(x,y,45))continue;
+      mapCtx.strokeStyle=i%3?"rgba(255,105,49,.36)":"rgba(255,205,103,.42)";mapCtx.lineWidth=2+scenicRand()*2;
+      mapCtx.beginPath();mapCtx.moveTo(x,y);mapCtx.lineTo(x+scenicRand()*18-9,y+scenicRand()*24);mapCtx.lineTo(x+scenicRand()*36-18,y+scenicRand()*42);mapCtx.stroke();
+    }
+    for(let i=0;i<24;i++){const x=scenicRand()*2000,y=scenicRand()*1300;const glow=mapCtx.createRadialGradient(x,y,1,x,y,18);glow.addColorStop(0,"rgba(255,211,105,.65)");glow.addColorStop(1,"rgba(255,75,35,0)");mapCtx.fillStyle=glow;mapCtx.beginPath();mapCtx.arc(x,y,18,0,Math.PI*2);mapCtx.fill();}
+  }else if(selectedTheme==="city"){
+    // Calçadas, canteiros e iluminação urbana.
+    for(const [x,y] of [[250,430],[1740,850],[1100,220],[850,1080]]){rounded(x-72,y-35,144,70,14,"rgba(44,103,78,.82)","rgba(181,224,172,.65)");for(let k=0;k<4;k++){ellipse(x-45+k*30,y,10,9,"#65a96b");}}
+    mapCtx.strokeStyle="rgba(226,238,244,.22)";mapCtx.lineWidth=3;mapCtx.setLineDash([12,16]);
+    for(const y of [120,1180]){mapCtx.beginPath();mapCtx.moveTo(0,y);mapCtx.lineTo(2000,y);mapCtx.stroke();}
+    mapCtx.setLineDash([]);
+  }else{
+    // Circuitos luminosos com nós e trilhas em ângulo reto.
+    for(let i=0;i<26;i++){const x=60+scenicRand()*1880,y=60+scenicRand()*1180;if(!clearSpot(x,y,35))continue;const c=i%2?"rgba(66,234,255,.42)":"rgba(255,104,217,.4)";
+      mapCtx.strokeStyle=c;mapCtx.lineWidth=3;mapCtx.beginPath();mapCtx.moveTo(x-25,y);mapCtx.lineTo(x+8,y);mapCtx.lineTo(x+8,y+22);mapCtx.stroke();
+      mapCtx.fillStyle=c;mapCtx.beginPath();mapCtx.arc(x-25,y,4,0,Math.PI*2);mapCtx.fill();
+    }
+  }
+  // Moldura interna fina e cantos destacados dão profundidade sem cobrir a arena.
+  mapCtx.strokeStyle="rgba(255,255,255,.20)";mapCtx.lineWidth=2;mapCtx.strokeRect(30,30,ARENA.w-60,ARENA.h-60);
+  for(const [x,y,sx,sy] of [[38,38,1,1],[1962,38,-1,1],[38,1262,1,-1],[1962,1262,-1,-1]]){
+    mapCtx.strokeStyle="rgba(255,255,255,.52)";mapCtx.lineWidth=5;mapCtx.beginPath();mapCtx.moveTo(x,y+sy*34);mapCtx.lineTo(x,y);mapCtx.lineTo(x+sx*34,y);mapCtx.stroke();
+  }
+  mapCtx.restore();
 
   // Moldura temática e detalhes de borda.
   const border=selectedTheme==="ice"||selectedTheme==="tundra"?"#e8fbff":selectedTheme==="desert"?"#ffdb91":selectedTheme==="volcano"?"#ff7546":selectedTheme==="neon"?"#f05cff":selectedTheme==="city"?"#a9c9df":"#b8e66b";
