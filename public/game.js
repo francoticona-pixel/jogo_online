@@ -370,6 +370,49 @@ function buildMap() {
   // Moldura temática e detalhes de borda.
   const border=selectedTheme==="ice"||selectedTheme==="tundra"?"#e8fbff":selectedTheme==="desert"?"#ffdb91":selectedTheme==="volcano"?"#ff7546":selectedTheme==="neon"?"#f05cff":selectedTheme==="city"?"#a9c9df":"#b8e66b";
   mapCtx.strokeStyle=border;mapCtx.lineWidth=8;mapCtx.globalAlpha=.72;mapCtx.strokeRect(14,14,ARENA.w-28,ARENA.h-28);mapCtx.globalAlpha=1;
+
+  // Acabamento 2D ilustrado: manchas orgânicas, contornos suaves e textura de pincel.
+  // A camada é determinística e puramente visual; não altera colisões nem a jogabilidade.
+  {
+    let artSeed=selectedTheme.split("").reduce((n,c)=>n*31+c.charCodeAt(0),7919)>>>0;
+    const rnd=()=>{artSeed=(artSeed*1664525+1013904223)>>>0;return artSeed/4294967296;};
+    const palettes={
+      forest:{ground:"#547d3e",shade:"rgba(22,65,34,.16)",light:"rgba(211,231,137,.20)",path:"#b89a62"},
+      jungle:{ground:"#246c50",shade:"rgba(5,43,35,.22)",light:"rgba(160,215,93,.18)",path:"#a99a58"},
+      ice:{ground:"#b9e5f2",shade:"rgba(44,112,157,.13)",light:"rgba(255,255,255,.38)",path:"#eafaff"},
+      tundra:{ground:"#c9e0e5",shade:"rgba(54,111,135,.15)",light:"rgba(255,255,255,.4)",path:"#edf7f7"},
+      desert:{ground:"#dca85f",shade:"rgba(133,75,37,.14)",light:"rgba(255,226,160,.25)",path:"#f3d18c"},
+      volcano:{ground:"#44333b",shade:"rgba(8,6,14,.25)",light:"rgba(255,119,62,.14)",path:"#795052"},
+      city:{ground:"#536779",shade:"rgba(17,30,44,.22)",light:"rgba(198,221,232,.15)",path:"#8295a4"},
+      neon:{ground:"#28264e",shade:"rgba(8,9,31,.25)",light:"rgba(80,225,255,.12)",path:"#55427c"}
+    };
+    const a=palettes[selectedTheme]||palettes.forest;
+    mapCtx.save();
+    // Grandes ilhas de terreno com bordas macias dão leitura de mapa ilustrado.
+    for(let n=0;n<34;n++){
+      const x=40+rnd()*1920,y=40+rnd()*1220,rx=55+rnd()*125,ry=28+rnd()*75;
+      mapCtx.fillStyle=a.shade;mapCtx.beginPath();mapCtx.ellipse(x+7,y+9,rx,ry,rnd()*.8,0,Math.PI*2);mapCtx.fill();
+      mapCtx.fillStyle=a.light;mapCtx.beginPath();mapCtx.ellipse(x,y,rx*.82,ry*.72,rnd()*.8,0,Math.PI*2);mapCtx.fill();
+    }
+    // Caminhos orgânicos com borda clara, conectando visualmente os espaços.
+    mapCtx.lineCap="round";mapCtx.lineJoin="round";
+    mapCtx.strokeStyle="rgba(20,25,28,.13)";mapCtx.lineWidth=76;
+    mapCtx.beginPath();mapCtx.moveTo(-30,410);mapCtx.bezierCurveTo(360,560,520,280,890,465);mapCtx.bezierCurveTo(1260,650,1550,360,2030,540);mapCtx.stroke();
+    mapCtx.strokeStyle=a.path;mapCtx.globalAlpha=.23;mapCtx.lineWidth=58;mapCtx.stroke();mapCtx.globalAlpha=1;
+    mapCtx.strokeStyle="rgba(255,255,255,.10)";mapCtx.lineWidth=3;mapCtx.stroke();
+    // Pontos de pincel e pequenas marcas de material.
+    for(let n=0;n<2300;n++){
+      const x=rnd()*ARENA.w,y=rnd()*ARENA.h,sz=1+rnd()*4;
+      mapCtx.fillStyle=n%2?a.light:a.shade;
+      mapCtx.beginPath();mapCtx.ellipse(x,y,sz*1.6,sz,rnd()*Math.PI,0,Math.PI*2);mapCtx.fill();
+    }
+    // Vinheta suave nas bordas para enquadrar a arena sem esconder o cenário.
+    const vignette=mapCtx.createRadialGradient(1000,650,380,1000,650,1160);
+    vignette.addColorStop(0,"rgba(0,0,0,0)");vignette.addColorStop(1,"rgba(5,12,18,.30)");
+    mapCtx.fillStyle=vignette;mapCtx.fillRect(0,0,ARENA.w,ARENA.h);
+    mapCtx.restore();
+  }
+
   drawMapPreview();
 }
 
