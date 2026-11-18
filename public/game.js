@@ -30,7 +30,12 @@ const powers = {
   medkit: { label: "KIT DE CURA", icon: "+", color: "#ff6d87" },
   life: { label: "VIDA EXTRA", icon: "♥", color: "#ff4f72" },
   rocket: { label: "MÍSSIL EXPLOSIVO", icon: "➤", color: "#ff9a52" },
-  armor: { label: "BLINDAGEM", icon: "⬟", color: "#8bc7d9" }
+  armor: { label: "BLINDAGEM", icon: "⬟", color: "#8bc7d9" },
+  blackhole: { label: "BURACO NEGRO • 1 TIRO", icon: "✹", color: "#b58cff" },
+  phase: { label: "FANTASMA", icon: "◈", color: "#7ee7ff" },
+  electric: { label: "CHOQUE ELÉTRICO", icon: "ϟ", color: "#ffe45e" },
+  blades: { label: "LÂMINAS ORBITAIS", icon: "✥", color: "#e4e8f0" },
+  timeStop: { label: "PARAR O TEMPO", icon: "◷", color: "#9cb7ff" }
 };
 const playerColors = ["#c5e36b", "#e46d5c", "#62c3dc", "#d7a6f5", "#f0bb62", "#69d0a4", "#f07caa", "#98a8ff", "#d6dfed", "#d2db70"];
 const walls = [
@@ -300,6 +305,8 @@ function drawPlayers(dt){
     ctx.save();ctx.translate(r.x,r.y);ctx.rotate(r.angle);
     ctx.globalAlpha=hidden ? 0.16 : 1;
     if(p.power==="shield" || p.invulnerableLeft>0){ctx.strokeStyle=p.invulnerableLeft>0?"#f7f3c2":powers.shield.color;ctx.lineWidth=3;ctx.globalAlpha=.85;ctx.beginPath();ctx.arc(0,0,p.invulnerableLeft>0?31:27,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=hidden ? .22 : 1;}
+    if(p.blades){const spin=performance.now()/180;for(let i=0;i<4;i++){const a=spin+i*Math.PI/2;ctx.save();ctx.rotate(a);ctx.fillStyle="#e8f2ff";ctx.shadowColor="#8db9ff";ctx.shadowBlur=12;ctx.beginPath();ctx.moveTo(0,-38);ctx.lineTo(7,-18);ctx.lineTo(0,-12);ctx.lineTo(-7,-18);ctx.closePath();ctx.fill();ctx.restore();}}
+    if(p.phased){ctx.strokeStyle="#7ee7ff";ctx.lineWidth=3;ctx.globalAlpha=.75;ctx.beginPath();ctx.arc(0,0,29,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=hidden?.22:1;}
     ctx.shadowColor=color;ctx.shadowBlur=0;
     ctx.fillStyle="#080d12";ctx.beginPath();ctx.roundRect(-23,-18,47,36,8);ctx.fill();
     ctx.shadowBlur=0;ctx.fillStyle="#29333a";ctx.fillRect(-20,-16,42,5);ctx.fillRect(-20,11,42,5);
@@ -336,8 +343,10 @@ function drawBullets(dt){
     const k=1-Math.exp(-dt/38);
     r.x+=(b.x-r.x)*k;r.y+=(b.y-r.y)*k;
     ctx.save();ctx.translate(r.x,r.y);ctx.rotate(Math.atan2(b.vy,b.vx));
-    const bomb=b.type==="bomb", flame=b.type==="flame", rocket=b.type==="rocket";
-    if(flame){
+    const bomb=b.type==="bomb", flame=b.type==="flame", rocket=b.type==="rocket", electric=b.type==="electric", blackhole=b.type==="blackhole";
+    if(blackhole){ctx.shadowColor="#9d68ff";ctx.shadowBlur=28;const pulse=10+Math.sin(performance.now()/65)*3;ctx.fillStyle="#090515";ctx.beginPath();ctx.arc(0,0,pulse,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#c4a2ff";ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(0,0,21,8,performance.now()/180,0,Math.PI*2);ctx.stroke();}
+    else if(electric){ctx.shadowColor="#ffe45e";ctx.shadowBlur=20;ctx.strokeStyle="#fff3a0";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-16,0);ctx.lineTo(-5,-8);ctx.lineTo(1,7);ctx.lineTo(10,-7);ctx.lineTo(17,0);ctx.stroke();}
+    else if(flame){
       const flicker=.78+Math.sin(performance.now()/32+b.id)*.22;
       const fire=ctx.createLinearGradient(-34,0,15,0);fire.addColorStop(0,"rgba(255,45,12,0)");fire.addColorStop(.35,"#ff4a16");fire.addColorStop(.72,"#ffb12f");fire.addColorStop(1,"#fff2a0");
       ctx.shadowColor="#ff4a16";ctx.shadowBlur=22;ctx.fillStyle=fire;ctx.beginPath();ctx.moveTo(-34,-7*flicker);ctx.quadraticCurveTo(-8,-13*flicker,16,0);ctx.quadraticCurveTo(-8,13*flicker,-34,7*flicker);ctx.closePath();ctx.fill();
@@ -371,6 +380,7 @@ function drawClones(){
   }
 }
 function drawExplosions(){
+  for(const h of state.blackholes||[]){const pulse=1+Math.sin(performance.now()/95)*.045;ctx.save();ctx.translate(h.x,h.y);ctx.scale(pulse,pulse);const grad=ctx.createRadialGradient(0,0,8,0,0,h.radius);grad.addColorStop(0,"rgba(0,0,0,1)");grad.addColorStop(.22,"rgba(16,5,35,.98)");grad.addColorStop(.55,"rgba(112,48,190,.55)");grad.addColorStop(1,"rgba(160,110,255,0)");ctx.fillStyle=grad;ctx.beginPath();ctx.arc(0,0,h.radius,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#c7a7ff";ctx.lineWidth=5;ctx.shadowColor="#9e68ff";ctx.shadowBlur=24;ctx.beginPath();ctx.ellipse(0,0,h.radius*.48,h.radius*.16,performance.now()/550,0,Math.PI*2);ctx.stroke();ctx.restore();}
   for(const e of state.explosions||[]){
     const progress=1-e.remaining/520, radius=e.radius*progress;
     ctx.save();ctx.globalAlpha=Math.max(0,e.remaining/520);
@@ -402,6 +412,7 @@ function draw(){
   ctx.drawImage(mapCanvas,sx,sy,viewW,viewH,sx,sy,viewW,viewH);
   if(state.gas && state.gas.remaining>0){ctx.save();ctx.fillStyle="rgba(144,205,83,.23)";ctx.beginPath();ctx.rect(0,0,ARENA.w,ARENA.h);ctx.arc(state.gas.x,state.gas.y,state.gas.radius,0,Math.PI*2,true);ctx.fill("evenodd");ctx.strokeStyle="rgba(188,235,110,.9)";ctx.lineWidth=8;ctx.beginPath();ctx.arc(state.gas.x,state.gas.y,state.gas.radius,0,Math.PI*2);ctx.stroke();ctx.restore();}
   drawCrates();drawClones();drawExplosions();drawBullets(dt);drawPlayers(dt);
+  if(state.timeStop){ctx.save();ctx.fillStyle="rgba(105,145,255,.12)";ctx.fillRect(sx,sy,viewW,viewH);ctx.fillStyle="#d8e4ff";ctx.font="bold 24px monospace";ctx.textAlign="center";ctx.fillText("TEMPO CONGELADO • "+(state.timeStop.remaining/1000).toFixed(1)+"s",camera.x,camera.y-viewH*.42);ctx.restore();}
   ctx.setTransform(1,0,0,1,0,0);
   requestAnimationFrame(draw);
 }
